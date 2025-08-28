@@ -65,7 +65,7 @@ class ICSDClient:
         """A timeout object to use for the ICSD API session."""
         return self._timeout
 
-    def get_cifs(self, identifier: str) -> str:
+    def get_cif(self, identifier: str) -> str:
         """Download a CIF for the entry given the ICSD identifier."""
         return self.session.get(f"{self.base_url}/cif/{identifier}")
 

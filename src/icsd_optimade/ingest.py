@@ -14,10 +14,14 @@ if TYPE_CHECKING:
     pass
 
 from optimade_maker.convert import _construct_entry_type_info
+from .client import ICSDClient
 
 
-def handle_chunk(args, run_name: str = "test", num_chunks: int | None = None):
+def handle_chunk(args, run_name: str = "test", num_chunks: int | None = None, client: ICSDClient | None = None):
     """Handle a chunk of the ICSD database, logging bad entries and showing a progress bar."""
+    if client is None:
+        client = ICSDClient()
+
     chunk_id, chunk_ids = args
     bad_count: int = 0
     total_count: int = 0
@@ -26,13 +30,13 @@ def handle_chunk(args, run_name: str = "test", num_chunks: int | None = None):
         try:
             for entry in chunk_ids:
                 # get cifs -> map cifs to OPTIMADE
-                cif = icsd_client.get_cif(entry)
+                cif = client.get_cif(entry)
                 # get references -> map references to OPTIMADE
                 if isinstance(entry, Exception):
                     bad_count += 1
                     continue
                 else:
-                    f.write(entry + "\n")
+                    f.write(str(entry) + "\n")
                 total_count += 1
         except RuntimeError:
             # The database iterator raises RuntimeError once we are out of bounds
@@ -74,6 +78,8 @@ def cli():
 
     ranges = (range(i * chunk_size, (i + 1) * chunk_size) for i in range(num_chunks))
 
+    icsd_client = ICSDClient()
+
     total_bad = 0
     total = 0
     with Pool(pool_size) as pool:
@@ -82,7 +88,7 @@ def cli():
             desc=f"Processing CSD ({chunk_size=}, {pool_size=}",
         ) as pbar:
             for chunk_id, total_count, bad_count in pool.imap_unordered(
-                partial(handle_chunk, run_name=run_name, num_chunks=num_chunks),
+                partial(handle_chunk, run_name=run_name, num_chunks=num_chunks, client=icsd_client),
                 enumerate(ranges),
                 chunksize=1,
             ):

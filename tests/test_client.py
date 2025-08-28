@@ -2,8 +2,6 @@ import os
 
 import pytest
 
-from icsd_optimade.client import ICSDClient
-
 
 def test_login_credentials(icsd_credentials, icsd_client):
     if not icsd_credentials:
