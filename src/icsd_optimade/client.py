@@ -1,4 +1,3 @@
-import datetime
 import os
 
 import httpx
@@ -82,7 +81,9 @@ class ICSDClient:
         json_resp = resp.json()
         return json_resp["idnums"]
 
-    def query_by_date_range(self, date_range: tuple[int, int], date_field: str = "recording") -> list[str]:
+    def query_by_date_range(
+        self, date_range: tuple[int, int], date_field: str = "recording"
+    ) -> list[str]:
         """Query the ICSD for the specified date range. The `date_field`
         can be set to one of the supported values in the ICSD:
 
@@ -95,10 +96,10 @@ class ICSDClient:
         if date_field == "recording":
             date_field = "recordingdate"
 
-        date_range = sorted(date_range)
         if date_range[0] == date_range[1]:
             raise RuntimeError("Date range must be a range, not a single date.")
 
-        query = f"{date_field}: {date_range[0]}-{date_range[1]}"
-        return self.query_entries(query)
+        _date_range = sorted(date_range)
 
+        query = f"{date_field}: {_date_range[0]}-{_date_range[1]}"
+        return self.query_entries(query)

@@ -6,18 +6,19 @@ import os
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import tqdm
-
-if TYPE_CHECKING:
-    pass
-
 from optimade_maker.convert import _construct_entry_type_info
+
 from .client import ICSDClient
 
 
-def handle_chunk(args, run_name: str = "test", num_chunks: int | None = None, client: ICSDClient | None = None):
+def handle_chunk(
+    args,
+    run_name: str = "test",
+    num_chunks: int | None = None,
+    client: ICSDClient | None = None,
+):
     """Handle a chunk of the ICSD database, logging bad entries and showing a progress bar."""
     if client is None:
         client = ICSDClient()
@@ -30,7 +31,7 @@ def handle_chunk(args, run_name: str = "test", num_chunks: int | None = None, cl
         try:
             for entry in chunk_ids:
                 # get cifs -> map cifs to OPTIMADE
-                cif = client.get_cif(entry)
+                _ = client.get_cif(entry)
                 # get references -> map references to OPTIMADE
                 if isinstance(entry, Exception):
                     bad_count += 1
@@ -88,7 +89,12 @@ def cli():
             desc=f"Processing CSD ({chunk_size=}, {pool_size=}",
         ) as pbar:
             for chunk_id, total_count, bad_count in pool.imap_unordered(
-                partial(handle_chunk, run_name=run_name, num_chunks=num_chunks, client=icsd_client),
+                partial(
+                    handle_chunk,
+                    run_name=run_name,
+                    num_chunks=num_chunks,
+                    client=icsd_client,
+                ),
                 enumerate(ranges),
                 chunksize=1,
             ):
