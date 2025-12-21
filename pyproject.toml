@@ -27,6 +27,7 @@ dependencies = [
     "tqdm ~= 4.66",
     "httpx ~= 0.28",
     "pymongo >= 4, < 5",
+    "ase>=3.26.0",
 ]
 
 [project.scripts]
