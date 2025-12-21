@@ -33,7 +33,6 @@ class ICSDClient:
             )
 
         self.headers["User-Agent"] = f"icsd-optimade ingester/{__version__}"
-        self.headers["Accept"] = "application/json"
         auth_token = self.login()
         self.headers["icsd-auth-token"] = auth_token
 
@@ -108,9 +107,12 @@ class ICSDClient:
 
     def get_cif(self, identifier: str | int) -> bytes:
         """Download a CIF for the entry given the ICSD identifier and return it as bytes."""
+        self.headers.pop("Accept")
         response = self.session.get(f"{self.base_url}/cif/{identifier}")
         if response.status_code != 200:
-            raise RuntimeError(f"CIF {identifier} not found.")
+            raise RuntimeError(
+                f"CIF {identifier} not found: [{response.status_code}] - {response.content}"
+            )
 
         return response.content
 
@@ -120,6 +122,7 @@ class ICSDClient:
 
     def query_entries(self, query: str) -> list[str]:
         """Return a list of matching entry IDs."""
+        self.headers["Accept"] = "application/json"
         resp = self.session.get(f"{self.base_url}/search/expert?query={query}")
         if resp.status_code != 200:
             raise RuntimeError(f"Search returned an error: {resp.content}")
@@ -142,6 +145,7 @@ class ICSDClient:
 
         Returns a list of matching IDs.
         """
+        self.headers["Accept"] = "application/json"
         if date_range[0] == date_range[1]:
             raise RuntimeError("Date range must be a range, not a single date.")
 
