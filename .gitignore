@@ -1,4 +1,5 @@
 data/
+.icsd-auth-token
 *.jsonl
 
 ## Python files
