@@ -5,12 +5,13 @@ import pytest
 from icsd_optimade.client import ICSDClient
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def icsd_credentials():
     if not (os.getenv("ICSD_LOGIN_ID") and os.getenv("ICSD_LOGIN_PASSWORD")):
         pytest.skip("No ICSD credentials set.")
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def icsd_client():
-    return ICSDClient()
+    with ICSDClient() as client:
+        yield client
