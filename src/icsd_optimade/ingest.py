@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import glob
 import json
 import logging
@@ -17,6 +18,14 @@ from optimade_maker.convert import _construct_entry_type_info
 from .client import ICSDClient
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "cifs"
+
+log = logging.getLogger("ingest")
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter("%(asctime)s - [PID: %(process)d] - %(levelname)s - %(message)s")
+)
+log.addHandler(console_handler)
 
 
 def _check_cif_cache(entry: int) -> bytes | None:
@@ -73,7 +82,7 @@ def map_cif_to_optimade(entry: int, client: ICSDClient) -> str | RuntimeError:
 
 
 def handle_chunk(
-    args,
+    chunk: tuple[datetime.date, datetime.date],
     run_name: str = "test",
     num_chunks: int | None = None,
     client: ICSDClient | None = None,
@@ -82,28 +91,37 @@ def handle_chunk(
     if client is None:
         client = ICSDClient()
 
-    chunk_id, chunk_ids = args
     bad_count: int = 0
     total_count: int = 0
-    str_chunk_id = f"{chunk_id:0{len(str(num_chunks))}d}"
-    log = logging.getLogger("ingest")
-    with open(f"data/{run_name}-optimade-{str_chunk_id}.jsonl", "w") as f:
-        try:
-            for entry in chunk_ids:
-                # get references -> map references to OPTIMADE
+
+    entry_ids = client.query_by_date_range(chunk)
+
+    log.error(
+        "Queried date range %s, %s returned %s results",
+        chunk[0],
+        chunk[1],
+        len(entry_ids),
+    )
+
+    if entry_ids:
+        with open(f"data/{run_name}-optimade-{chunk[0].year}.jsonl", "w") as f:
+            for entry in entry_ids:
                 optimade = map_cif_to_optimade(entry, client)
                 if isinstance(entry, Exception):
                     bad_count += 1
                     continue
+
                 else:
                     f.write(str(optimade) + "\n")
-                total_count += 1
-        except RuntimeError:
-            log.error(f"Bad entry: {entry}")
-    if total_count == 0 and bad_count != 0:
-        raise RuntimeError("No good entries found in chunk; something went wrong.")
 
-    return chunk_id, total_count, bad_count
+                total_count += 1
+
+    if total_count == 0 and bad_count != 0:
+        raise RuntimeError(
+            "No good entries found in chunk {chunk}; something went wrong."
+        )
+
+    return total_count, bad_count
 
 
 def cli():
@@ -112,57 +130,47 @@ def cli():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--num-processes", type=int, default=4)
-    parser.add_argument("--chunk-size", type=int, default=10_000)
-    parser.add_argument(
-        "--num-structures",
-        type=int,
-        nargs="?",
-        const=int(1_290_000),
-        default=int(1_290_000),
-    )
-    parser.add_argument("--run-name", type=str, default="csd")
+    parser.add_argument("--run-name", type=str, default="icsd")
+    parser.add_argument("--combine-only", action="store_true")
 
     args = parser.parse_args()
 
     pool_size = args.num_processes
-    chunk_size = args.chunk_size
-    if chunk_size > int(args.num_structures):
-        chunk_size = int(args.num_structures)
-        num_chunks = 1
-        pool_size = 1
-    else:
-        num_chunks = int(args.num_structures) // chunk_size
-
     run_name = args.run_name
 
-    ranges = (range(i * chunk_size, (i + 1) * chunk_size) for i in range(num_chunks))
+    start_year = 1950
+    end_year = datetime.datetime.today().year
+
+    date_ranges = (
+        (datetime.date(year=i, month=1, day=1), datetime.date(year=i, month=12, day=31))
+        for i in range(start_year, end_year)
+    )
 
     icsd_client = ICSDClient()
 
     total_bad = 0
     total = 0
-    with Pool(pool_size) as pool:
-        with tqdm.tqdm(
-            total=num_chunks * chunk_size,
-            desc=f"Processing ICSD ({chunk_size=}, {pool_size=}",
-        ) as pbar:
-            for chunk_id, total_count, bad_count in pool.imap_unordered(
-                partial(
-                    handle_chunk,
-                    run_name=run_name,
-                    num_chunks=num_chunks,
-                    client=icsd_client,
-                ),
-                enumerate(ranges),
-                chunksize=1,
-            ):
-                total_bad += bad_count
-                total += total_count
-                pbar.update(total)
-                try:
-                    pbar.set_postfix({"% bad": 100 * (total_bad / total)})
-                except ZeroDivisionError:
-                    pbar.set_postfix({"% bad": "???"})
+    if not args.combine_only:
+        with Pool(pool_size) as pool:
+            with tqdm.tqdm(
+                desc=f"Processing ICSD ({pool_size=}",
+            ) as pbar:
+                for total_count, bad_count in pool.imap_unordered(
+                    partial(
+                        handle_chunk,
+                        run_name=run_name,
+                        client=icsd_client,
+                    ),
+                    date_ranges,
+                    chunksize=1,
+                ):
+                    total_bad += bad_count
+                    total += total_count
+                    pbar.update(total)
+                    try:
+                        pbar.set_postfix({"% bad": 100 * (total_bad / total)})
+                    except ZeroDivisionError:
+                        pbar.set_postfix({"% bad": "???"})
 
     # Combine all results into a single JSONL file, first temporary
     output_file = f"{run_name}-optimade.jsonl"
