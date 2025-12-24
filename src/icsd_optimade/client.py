@@ -1,7 +1,6 @@
 import datetime
 import logging
 import os
-import random
 import time
 from pathlib import Path
 from typing import Literal
@@ -61,8 +60,7 @@ class ICSDClient:
         self.headers["User-Agent"] = (
             f"icsd-optimade ingester/{__version__} Contact dev@datalab.industries with issues/problematic usage"
         )
-        auth_token = self.login()
-        self.headers["icsd-auth-token"] = auth_token
+        self.login()
 
     def __enter__(self):
         return self
@@ -82,7 +80,6 @@ class ICSDClient:
         """Attempt to rotate the session key in a parallel-safe way."""
         owns_lock = False
         lock = Path(".icsd-session.lock")
-        time.sleep(random.random() * 5)
         if not lock.is_file():
             with open(lock, "w") as f:
                 f.write(str(os.getpid()))
@@ -135,6 +132,7 @@ class ICSDClient:
             )
             if check_auth.status_code == 404:
                 log.error(f"Using pre-existing login session {auth_token}")
+                self.headers["icsd-auth-token"] = auth_token
                 return auth_token
 
         login_resp = httpx.post(
@@ -146,10 +144,14 @@ class ICSDClient:
             raise RuntimeError(
                 f"Failed to authenticate to ICSD at {self.base_url!r}: {login_resp.status_code=}. Error returned: {login_resp.content}"
             )
+        token = login_resp.headers["icsd-auth-token"]
+
         with open(self._cached_token_path, "w") as f:
-            f.write(login_resp.headers["icsd-auth-token"])
-        log.error(f"Logged into session {login_resp.headers['icsd-auth-token']}")
-        return login_resp.headers["icsd-auth-token"]
+            f.write(token)
+
+        self.headers["icsd-auth-token"] = token
+        log.error(f"Logged into session {token}")
+        return token
 
     @property
     def session(self) -> httpx.Client:
