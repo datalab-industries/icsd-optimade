@@ -212,7 +212,7 @@ def cli():
             with open(file) as infile:
                 tmp_jsonl.write(infile.read())
             tmp_jsonl.write("\n")
-            file.unlink()
+            # file.unlink()
 
     with open(tmp_jsonl_path) as tmp_jsonl:
         ids_by_type: dict[str, set] = {}
@@ -220,7 +220,10 @@ def cli():
             for line_entry in tmp_jsonl:
                 if not line_entry.strip():
                     continue
-                json_entry = json.loads(line_entry)
+                try:
+                    json_entry = json.loads(line_entry)
+                except Exception as exc:
+                    log.error(f"Bad entry at {line_entry}: {exc}")
                 if _type := json_entry.get("type"):
                     if _type not in ids_by_type:
                         ids_by_type[_type] = set()
