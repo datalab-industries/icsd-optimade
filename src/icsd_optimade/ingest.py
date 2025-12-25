@@ -85,6 +85,8 @@ def map_cif_to_optimade(entry_id: int, client: ICSDClient) -> str | RuntimeError
         return RuntimeError(f"Unable to convert ASE atoms to OPTIMADE structure: {exc}")
 
     entry = structure.entry.model_dump()
+    entry["id"] = str(entry_id)
+    entry["attributes"]["immutable_id"] = str(entry_id)
     # ASE spg cannot be serialized as JSON, first just take the number
     entry["attributes"]["_ase_spacegroup"] = entry["attributes"]["_ase_spacegroup"].no  # type: ignore
     return json.dumps(entry)
