@@ -5,6 +5,7 @@ from io import BytesIO
 import ase.io
 import CifFile
 from optimade.adapters import Reference, Structure
+from optimade.models import Person
 
 from .client import ICSDClient
 from .utils import get_cif
@@ -89,7 +90,7 @@ def map_cif_to_optimade(entry_id: int, client: ICSDClient) -> str | RuntimeError
     reference.entry.attributes.year = str(cif["_citation_year"][reference_index])
     reference.entry.attributes.journal = cif["_citation_journal_full"][reference_index]
     reference.entry.attributes.authors = [
-        {"name": n} for n in cif["_citation_author_name"]
+        Person(name=n) for n in cif["_citation_author_name"]
     ]  # TODO: need to check this, CIF may not be parsed correctly here wrt. loop over authors
 
     entry["relationships"] = {}
