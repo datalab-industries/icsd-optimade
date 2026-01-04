@@ -52,6 +52,12 @@ def handle_chunk(
     )
 
     if entry_ids:
+        log.info(
+            "Checking for missing CIFs in range %s to %s (%s entries)",
+            chunk[0],
+            chunk[1],
+            len(entry_ids),
+        )
         if download_only:
             for entry in entry_ids:
                 get_cif(int(entry), client)
@@ -59,6 +65,9 @@ def handle_chunk(
 
         else:
             with open(f"data/{run_name}-optimade-{chunk[0].year}.jsonl", "w") as f:
+                log.info(
+                    f"Mapping entries to OPTIMADE format and saving as {run_name}-optimade-{chunk[0].year}.jsonl"
+                )
                 for entry in entry_ids:
                     optimade = map_cif_to_optimade(int(entry), client)
                     if isinstance(entry, Exception):
