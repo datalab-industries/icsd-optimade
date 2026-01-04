@@ -97,12 +97,14 @@ def cli():
     parser.add_argument("--run-name", type=str, default="icsd")
     parser.add_argument("--combine-only", action="store_true")
     parser.add_argument("--log-level", type=str, default="WARNING")
+    parser.add_argument("--skip-download", action="store_true")
 
     args = parser.parse_args()
 
     pool_size = args.num_processes
     run_name = args.run_name
     log_level = args.log_level
+    skip_download = args.skip_download
 
     log = setup_log("ingest", log_level=log_level)
 
@@ -120,12 +122,15 @@ def cli():
         handle_chunk, run_name=run_name, client=icsd_client, download_only=True
     )
 
-    with tqdm.tqdm(
-        desc="Downloading ICSD CIFs single-threaded",
-    ) as pbar:
-        for dates in date_ranges:
-            total_count, bad_count = chunk_processor(dates)
-            pbar.update(total_count)
+    if not skip_download:
+        log.info("Skipping download step as per user request.")
+
+        with tqdm.tqdm(
+            desc="Downloading ICSD CIFs single-threaded",
+        ) as pbar:
+            for dates in date_ranges:
+                total_count, bad_count = chunk_processor(dates)
+                pbar.update(total_count)
 
     total_bad = 0
     total = 0
@@ -139,6 +144,7 @@ def cli():
                         handle_chunk,
                         run_name=run_name,
                         client=icsd_client,
+                        download_only=False,
                     ),
                     date_ranges,
                     chunksize=1,
