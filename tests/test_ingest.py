@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 
@@ -11,3 +12,9 @@ def test_ingest(tmpdir):
     assert (Path(tmpdir) / "data" / "cifs").is_dir()
     assert len(list((Path(tmpdir) / "data" / "cifs").iterdir())) > 0
     assert (Path(tmpdir) / "data" / "icsd-optimade.jsonl").is_file()
+
+    with open(Path(tmpdir) / "data" / "icsd-optimade.jsonl") as f:
+        line = f.readline()
+    header = json.loads(line)
+    assert header["x-optimade"]
+    assert header["x-optimade"]["meta"]["api_version"] == "1.1.0"
