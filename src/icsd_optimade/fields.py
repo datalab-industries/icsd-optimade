@@ -11,9 +11,40 @@ from icsd_optimade import __version__
 
 
 def generate_provider_fields() -> dict[str, list[dict[str, str]]]:
+    # TODO: replace placeholder descriptions with those from CIF
     return {
         "references": [],
         "structures": [
+            {
+                "name": "_cif_chemical_name_common",
+                "type": "string",
+                "description": "Chemical name",
+            },
+            {
+                "name": "_chemical_formula_structural",
+                "type": "string",
+                "description": "See also chemical_formula_descriptive.",
+            },
+            {
+                "name": "_cif_chemical_formula_sum",
+                "type": "string",
+                "description": "Chemical formula sum",
+            },
+            {
+                "name": "_cif_chemical_name_structure_type",
+                "type": "string",
+                "description": "Structure type",
+            },
+            {
+                "name": "_cif_exptl_crystal_density_diffrn",
+                "type": "float",
+                "description": "Density from diffrn",
+            },
+            {
+                "name": "_cif_diffrn_ambient_temperature",
+                "type": "float",
+                "description": "Temperature during diffrn",
+            },
             {
                 "name": "_cif_audit_creation_date",
                 "type": "string",
@@ -119,6 +150,11 @@ def generate_provider_fields() -> dict[str, list[dict[str, str]]]:
                 "name": "_cif_cell_angle_gamma_raw",
                 "type": "string",
                 "description": "Raw string value of unit cell angle gamma from the CIF.",
+            },
+            {
+                "name": "_cif_space_group_name_H-M_alt",
+                "type": "string",
+                "description": "spg symbol",
             },
         ],
     }

@@ -47,6 +47,7 @@ def map_cif_to_optimade(
 
     entry = structure.entry.model_dump()
     entry["attributes"].pop("_ase_spacegroup", None)  # Remove non-serializable data
+    entry["attributes"]["_icsd_cif_file_id"] = entry_id
 
     # Read with PyCIFRW to extract other metdata: IDs, dates, references
     try:
@@ -77,7 +78,6 @@ def map_cif_to_optimade(
     entry["attributes"]["_cif_audit_creation_date"] = _isoformat(
         cif.get("_audit_creation_date")
     )
-
     if (
         entry["attributes"]["last_modified"] is None
         and entry["attributes"]["_cif_audit_creation_date"] is not None
@@ -87,7 +87,11 @@ def map_cif_to_optimade(
         ]
 
     entry["attributes"]["space_group_it_number"] = cif["_space_group_it_number"]
+    # entry["attributes"]["space_group_symbol_hermann_mauguin_extended"] = cif[
+    #    "_space_group_name_H-M_alt"
+    # ]
 
+    # TODO: unify this with fields.py module
     cif_namespace = {
         "_cell_formula_units_Z": int,
         "_cell_length_a": uncertain_float,
@@ -97,14 +101,29 @@ def map_cif_to_optimade(
         "_cell_angle_alpha": uncertain_float,
         "_cell_angle_beta": uncertain_float,
         "_cell_angle_gamma": uncertain_float,
+        "_chemical_name_common": str,
+        "_chemical_formula_structural": str,
+        "_chemical_formula_sum": str,
+        "_chemical_name_structure_type": str,
+        "_exptl_crystal_density_diffrn": float,
+        "_diffrn_ambient_temperature": float,
+        "_space_group_name_H-M_alt": str,
     }
     for field in cif_namespace:
+        value = cif.get(field)
+        if not value:
+            continue
+
         if cif_namespace[field] is uncertain_float:
-            entry["attributes"][f"_cif{field}"], u = cif_namespace[field](cif[field])  # type: ignore
+            entry["attributes"][f"_cif{field}"], u = cif_namespace[field](value)  # type: ignore
             entry["attributes"][f"_cif{field}_uncertainty"] = u
-            entry["attributes"][f"_cif{field}_raw"] = cif[field]
+            entry["attributes"][f"_cif{field}_raw"] = value
         else:
-            entry["attributes"][f"_cif{field}"] = cif_namespace[field](cif[field])  # type: ignore
+            entry["attributes"][f"_cif{field}"] = cif_namespace[field](value)  # type: ignore
+
+    entry["attributes"]["chemical_formula_descriptive"] = cif.get(
+        "_chemical_formula_structural"
+    )
 
     # TODO: extract uncertainties for other float fields, and expose them as metadata
 
