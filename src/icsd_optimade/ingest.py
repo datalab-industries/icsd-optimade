@@ -140,20 +140,20 @@ def ingest_by_year(
         for i in range(start_year, end_year)
     )
 
-    icsd_client = ICSDClient()
-
-    chunk_processor = partial(
-        handle_chunk,
-        run_name=run_name,
-        data_dir=data_dir,
-        client=icsd_client,
-        download_only=True,
-        log_level=log_level,
-    )
-
     if skip_download:
         log.info("Skipping download step as per user request.")
     else:
+        icsd_client = ICSDClient()
+
+        chunk_processor = partial(
+            handle_chunk,
+            run_name=run_name,
+            data_dir=data_dir,
+            client=icsd_client,
+            download_only=True,
+            log_level=log_level,
+        )
+        
         with tqdm.tqdm(
             desc="Downloading ICSD CIFs single-threaded",
         ) as pbar:
