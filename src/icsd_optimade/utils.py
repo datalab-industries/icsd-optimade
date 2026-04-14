@@ -110,3 +110,26 @@ def uncertain_float(value: str) -> tuple[float, float | None]:
         return float(base), float(uncertainty) * scale
 
     return float(value), None
+
+def strip_copyright(cif_path):
+    cif_content = cif_path.read_text()
+    lines = cif_content.split('\n')
+
+    # Find the first data_ or global_ line
+    start_idx = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('data_') or stripped.startswith('global_'):
+            start_idx = i
+            break
+        # Also accept lines starting with # (comments are OK)
+        if stripped.startswith('#'):
+            continue
+        # If we see anything else before data_, it's likely a header to skip
+        if '(C)' in stripped or 'copyright' in stripped.lower() or 'rights reserved' in stripped.lower():
+            continue
+
+    # Reconstruct clean CIF
+    clean_cif = '\n'.join(lines[start_idx:])
+
+    return clean_cif.encode()
