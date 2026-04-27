@@ -26,6 +26,7 @@ def handle_chunk(
     num_chunks: int | None = None,
     client: ICSDClient | None = None,
     download_only: bool = False,
+    skip_download: bool = False,
     log_level: str = "INFO",
 ):
     """Handle a chunk of the ICSD database, queried by date, logging bad entries and showing a progress bar.
@@ -43,7 +44,7 @@ def handle_chunk(
 
     log = setup_log(f"ingest-chunk-{os.getpid()}", log_level=log_level)
 
-    if client is None:
+    if client is None and not skip_download:
         client = ICSDClient()
 
     bad_count: int = 0
@@ -142,6 +143,7 @@ def ingest_by_year(
 
     if skip_download:
         log.info("Skipping download step as per user request.")
+        icsd_client = None
     else:
         icsd_client = ICSDClient()
 
@@ -152,8 +154,9 @@ def ingest_by_year(
             client=icsd_client,
             download_only=True,
             log_level=log_level,
+            skip_download=skip_download,
         )
-        
+
         with tqdm.tqdm(
             desc="Downloading ICSD CIFs single-threaded",
         ) as pbar:
@@ -175,6 +178,8 @@ def ingest_by_year(
                         run_name=run_name,
                         client=icsd_client,
                         download_only=False,
+                        log_level=log_level,
+                        skip_download=skip_download,
                     ),
                     date_ranges,
                     chunksize=1,
