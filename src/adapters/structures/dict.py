@@ -2,6 +2,10 @@
 Convert an OPTIMADE structure, in the format of
 [`StructureResource`][optimade.models.structures.StructureResource]
 to and from a standard python dictionary.
+
+This conversion function relies on the [pycifrw](https://github.com/jamesrhester/pycifrw) package.
+
+For more information on the pycifrw code see [their github repository](https://github.com/jamesrhester/pycifrw).
 """
 
 from typing import Union
@@ -21,7 +25,7 @@ __all__ = (
     "from_dict",
 )
 
-def get_dict(optimade_structure: Union[OptimadeStructure, StructureResourceAttributes]) -> dict:
+def get_dict(optimade_structure: OptimadeStructure) -> dict:
     """Get standard python mapped dictionary from OPTIMADE structure.
 
     This function will return a python dictionary based on the OPTIMADE structure.
@@ -39,6 +43,11 @@ def get_dict(optimade_structure: Union[OptimadeStructure, StructureResourceAttri
         A python dictionary.
 
     """
+    # if valid_lattice_vector(optimade_structure.attributes.lattice_vectors) and (  # type: ignore[arg-type]
+    #     optimade_structure.attributes.nperiodic_dimensions > 0  # type: ignore[operator]
+    #     or any(optimade_structure.attributes.dimension_types)  # type: ignore[arg-type]
+    # ):
+    #     return _get_structure(optimade_structure)
 
     return _get_structure(optimade_structure)
 
@@ -53,5 +62,10 @@ def _get_structure(optimade_structure: Union[OptimadeStructure, StructureResourc
 
 def from_dict(attributes: dict) -> StructureResourceAttributes:
     """Create an OPTIMADE structure from a python dictionary."""
+
+    if not isinstance(attributes, dict):
+        raise RuntimeError(
+            f"Cannot convert type {type(attributes)} into an OPTIMADE `StructureResourceAttributes` model using this method, please provide a dictionary."
+        )
 
     return StructureResourceAttributes(**attributes)
