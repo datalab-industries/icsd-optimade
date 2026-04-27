@@ -42,3 +42,5 @@ ENV/
 matplotlibrc
 /investigation
 .DS_STORE
+
+*.cif
