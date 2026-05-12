@@ -116,6 +116,11 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
                                                 pycifrw_structure["_atom_site_fract_x"],
                                                 pycifrw_structure["_atom_site_fract_y"],
                                                 pycifrw_structure["_atom_site_fract_z"]):
+        
+        # Cast any Deuterium or Tritium symbols to Hydrogen
+        # Use regex to switch D or T exactly, leaving trailing digits intact and skipping Dy etc. 
+        symbol = re.sub(r"(D|T)(?![a-z])", "H", symbol)
+
         species_list.append([symbol, 
                             _strip_uncertainty(concentration), 
                             (_strip_uncertainty(x), _strip_uncertainty(y), _strip_uncertainty(z))])
