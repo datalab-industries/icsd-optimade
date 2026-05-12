@@ -179,4 +179,4 @@ def from_cif(cif_string: Union[bytes, str],
     except Exception as e:
         raise RuntimeError(f"Unable to read CIF: {e}")
 
-    return from_pycifrw(pycifrw_dct)
+    return from_pycifrw(pycifrw_dct, id=id)
