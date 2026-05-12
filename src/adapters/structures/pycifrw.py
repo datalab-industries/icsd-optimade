@@ -138,7 +138,7 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
 
         if total_ratio < 1.0:
             vacancy_concentration = 1.0 - total_ratio
-            site_data["symbols"].append("X")
+            site_data["symbols"].append("vacancy")
             site_data["concentrations"].append(vacancy_concentration)
 
     sg = Spacegroup(int(pycifrw_structure["_space_group_IT_number"]))
