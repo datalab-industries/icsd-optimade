@@ -16,6 +16,7 @@ Note:
 
 This conversion function relies on the [NumPy](https://numpy.org/) library.
 """
+import re
 from typing import Union 
 from io import BytesIO
 import CifFile
@@ -170,6 +171,10 @@ def from_cif(cif_string: Union[bytes, str],
         cif_bytes = cif_string
 
     cif_bytes = cif_bytes.decode('utf-8', errors='ignore')
+
+    # Catch bug where latex in titles/formulae throws an error
+    cif_bytes = re.sub(r'\$', '', cif_bytes)
+    
     cif_bytes = cif_bytes.encode('ascii', errors='ignore')
     cif_bytes += b'\x1a'
 
