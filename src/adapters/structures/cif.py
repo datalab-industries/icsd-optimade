@@ -174,7 +174,24 @@ def from_cif(cif_string: Union[bytes, str],
 
     # Catch bug where latex in titles/formulae throws an error
     cif_bytes = re.sub(r'\$', '', cif_bytes)
+
+    # Catch bug where multiline fields split by ; aren't caught correctly by PyCIFRW
+    def repl(match):
+        key = match.group(1)
+        value = match.group(2)
+
+        # flatten whitespace/newlines
+        value = " ".join(value.split())
+
+        return f"{key} '{value}'"
     
+    # cast single line ; delimiters to ' and ' delimiters
+    cif_bytes = re.sub(
+        r'(?ms)^(_\S+)\s*\n\s*;\s*\n(.*?)\n;\s*$',
+        repl,
+        cif_bytes
+    )
+
     cif_bytes = cif_bytes.encode('ascii', errors='ignore')
     cif_bytes += b'\x1a'
 
