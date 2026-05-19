@@ -107,7 +107,7 @@ def map_cif_to_optimade(
         "_chemical_name_structure_type": str,
         "_exptl_crystal_density_diffrn": float,
         "_diffrn_ambient_temperature": float,
-        "_space_group_name_H-M_alt": str,
+        # "_space_group_name_H-M_alt": str,
     }
     for field in cif_namespace:
         value = cif.get(field)
