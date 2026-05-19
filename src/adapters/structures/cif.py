@@ -170,6 +170,9 @@ def from_cif(cif_string: Union[bytes, str],
     else:
         cif_bytes = cif_string
 
+    if 'Unauthorized' in str(cif_bytes):
+        raise Exception('Unauthorized')
+
     cif_bytes = cif_bytes.decode('utf-8', errors='ignore')
 
     # Catch bug where latex in titles/formulae throws an error
@@ -182,6 +185,9 @@ def from_cif(cif_string: Union[bytes, str],
 
         # flatten whitespace/newlines
         value = " ".join(value.split())
+        
+        # CIF escaping for single-quoted strings
+        value = value.replace("'", "")
 
         return f"{key} '{value}'"
     
@@ -190,6 +196,26 @@ def from_cif(cif_string: Union[bytes, str],
         r'(?ms)^(_\S+)\s*\n\s*;\s*\n(.*?)\n;\s*$',
         repl,
         cif_bytes
+    )
+
+    # Remove any breaking apostrophes from _chemical_name_common
+    cif_bytes = re.sub(
+        r'^(_chemical_name_common)\s+([^\n]*)',
+        lambda m: (
+            m.group(1) + ' ' + "'" + m.group(2).replace("'", '') + "'"
+        ),
+        cif_bytes,
+        flags=re.MULTILINE
+    )
+
+    # Remove any breaking apostrophes from _chemical_name_common
+    cif_bytes = re.sub(
+        r'^(_chemical_name_structure_type)\s+([^\n]*)',
+        lambda m: (
+            m.group(1) + ' ' + "'" + m.group(2).replace("'", '') + "'"
+        ),
+        cif_bytes,
+        flags=re.MULTILINE
     )
 
     cif_bytes = cif_bytes.encode('ascii', errors='ignore')
