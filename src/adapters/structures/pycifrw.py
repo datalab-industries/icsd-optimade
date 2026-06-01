@@ -154,6 +154,25 @@ def _get_anisotropic_factors(pycifrw_structure: CifFile, atom_site_label: str) -
 def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeStructureSpecies], np.ndarray]:
     ''' Get the species from the atom site type symbols '''
 
+    cell_vectors = [
+        UncertainFloat(pycifrw_structure["_cell_length_a"]),
+        UncertainFloat(pycifrw_structure["_cell_length_b"]),
+        UncertainFloat(pycifrw_structure["_cell_length_c"]),
+        UncertainFloat(pycifrw_structure["_cell_angle_alpha"]),
+        UncertainFloat(pycifrw_structure["_cell_angle_beta"]),
+        UncertainFloat(pycifrw_structure["_cell_angle_gamma"])
+    ]
+
+    cell = Cell.new([x.value for x in cell_vectors])
+    cell_uncertainties = {
+        'a': cell_vectors[0].uncertainty,
+        'b': cell_vectors[1].uncertainty,
+        'c': cell_vectors[2].uncertainty,
+        'alpha': cell_vectors[3].uncertainty,
+        'beta': cell_vectors[4].uncertainty,
+        'gamma': cell_vectors[5].uncertainty,
+    }
+
     species_list = []
     
     for i, (atom_site_label, concentration, x, y, z) in enumerate(zip(
@@ -175,6 +194,21 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
         aniso_factors = _get_anisotropic_factors(pycifrw_structure, atom_site_label)
         species.append(aniso_factors)
         species.append(atom_site_label)
+        fractional_uncertainty_tensor = np.array([
+                UncertainFloat(x).uncertainty,
+                UncertainFloat(y).uncertainty,
+                UncertainFloat(z).uncertainty])
+
+        cartesian_uncertainty_tensor = cell.cartesian_positions(fractional_uncertainty_tensor)
+        
+        species.append({
+            f"{atom_site_label}_x_fractional": fractional_uncertainty_tensor[0],
+            f"{atom_site_label}_y_fractional": fractional_uncertainty_tensor[1],
+            f"{atom_site_label}_z_fractional": fractional_uncertainty_tensor[2],
+            f"{atom_site_label}_x_cartesian": cartesian_uncertainty_tensor[0],
+            f"{atom_site_label}_y_cartesian": cartesian_uncertainty_tensor[1],
+            f"{atom_site_label}_z_cartesian": cartesian_uncertainty_tensor[2],
+        })
 
         species_list.append(species)
 
@@ -183,14 +217,16 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
         "symbols": [],
         "concentrations": [],
         "_anisotropic_factors": [],
-        "_atom_site_labels": []
+        "_atom_site_labels": [],
+        "_uncertainties": []
     })
 
-    for symbol, concentration, xyz, aniso_factors, atom_site_label in species_list:
-        temp_sites_struct[xyz]["symbols"].append(_strip_atom_symbol(symbol))
-        temp_sites_struct[xyz]["concentrations"].append(concentration)
-        temp_sites_struct[xyz]["_anisotropic_factors"].append(aniso_factors)
-        temp_sites_struct[xyz]["_atom_site_labels"].append(atom_site_label)
+    for symbol, concentration, site, aniso_factors, atom_site_label, uncertainties in species_list:
+        temp_sites_struct[site]["symbols"].append(_strip_atom_symbol(symbol))
+        temp_sites_struct[site]["concentrations"].append(concentration)
+        temp_sites_struct[site]["_anisotropic_factors"].append(aniso_factors)
+        temp_sites_struct[site]["_atom_site_labels"].append(atom_site_label)
+        temp_sites_struct[site]["_uncertainties"].append(uncertainties)
 
     # Calculate the concentrations of any vacancy symbols 
     for site, site_data in temp_sites_struct.items():
@@ -222,60 +258,49 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
     species_list = []
     fractional_sites = []
     anisotropic_displacements = {}
+    site_uncertainties = {}
 
     # Use ase cell to convert the fractional coordinates to cartesian coordinates
     cartesian_sites = []
 
-    cell_vectors = [
-        UncertainFloat(pycifrw_structure["_cell_length_a"]),
-        UncertainFloat(pycifrw_structure["_cell_length_b"]),
-        UncertainFloat(pycifrw_structure["_cell_length_c"]),
-        UncertainFloat(pycifrw_structure["_cell_angle_alpha"]),
-        UncertainFloat(pycifrw_structure["_cell_angle_beta"]),
-        UncertainFloat(pycifrw_structure["_cell_angle_gamma"])
-    ]
 
-    cell = Cell.new([x.value for x in cell_vectors])
-    cell_uncertainties = {
-        'a': cell_vectors[0].uncertainty,
-        'b': cell_vectors[1].uncertainty,
-        'c': cell_vectors[2].uncertainty,
-        'alpha': cell_vectors[3].uncertainty,
-        'beta': cell_vectors[4].uncertainty,
-        'gamma': cell_vectors[5].uncertainty,
-    }
-
-    for site in temp_sites_struct.keys():
+    for site, site_data in temp_sites_struct.items():
+        label = site_data['label'] + '_1'
         fractional_sites.append(site)
         cart_coords = cell.cartesian_positions(np.array(site).reshape(-1, 3))
         cartesian_sites.append(cart_coords.reshape(-1).tolist())
-        species_at_sites.append(f"{temp_sites_struct[site]['label']}_1")
+        species_at_sites.append(label)
         species_list.append(
-            OptimadeStructureSpecies(name=f"{temp_sites_struct[site]['label']}_1", 
-                                    chemical_symbols=temp_sites_struct[site]['symbols'], 
-                                    concentration=temp_sites_struct[site]['concentrations'])
+            OptimadeStructureSpecies(name=label, 
+                                    chemical_symbols=site_data['symbols'], 
+                                    concentration=site_data['concentrations'])
         ) 
 
-        if any([len(x) > 0 for x in temp_sites_struct[site]['_anisotropic_factors']]):
-            anisotropic_displacements[f"{temp_sites_struct[site]['label']}_1"] = {
-                temp_sites_struct[site]['_atom_site_labels'][i]: temp_sites_struct[site]['_anisotropic_factors'][i] for i in range(len(temp_sites_struct[site]['_anisotropic_factors']))
+        if any([len(x) > 0 for x in site_data['_anisotropic_factors']]):
+            anisotropic_displacements[label] = {
+                site_data['_atom_site_labels'][i]: site_data['_anisotropic_factors'][i] for i in range(len(site_data['_anisotropic_factors']))
             }
 
-        for i, equivalent_site in enumerate(temp_sites_struct[site]["equivalent_sites"]):
+        site_uncertainties[label] = site_data['_uncertainties']
+
+        for i, equivalent_site in enumerate(site_data["equivalent_sites"]):
+            label = site_data['label'] + f'_{i+2}'
             fractional_sites.append(equivalent_site)
             cart_coords = cell.cartesian_positions(np.array(equivalent_site).reshape(-1, 3))
             cartesian_sites.append(cart_coords.reshape(-1).tolist())
-            species_at_sites.append(f"{temp_sites_struct[site]['label']}_{i+2}")
+            species_at_sites.append(label)
             species_list.append(
-                OptimadeStructureSpecies(name=f"{temp_sites_struct[site]['label']}_{i+2}", 
-                                        chemical_symbols=temp_sites_struct[site]['symbols'], 
-                                        concentration=temp_sites_struct[site]['concentrations'])
+                OptimadeStructureSpecies(name=label, 
+                                        chemical_symbols=site_data['symbols'], 
+                                        concentration=site_data['concentrations'])
             )
 
-            if any([len(x) > 0 for x in temp_sites_struct[site]['_anisotropic_factors']]):
-                anisotropic_displacements[f"{temp_sites_struct[site]['label']}_{i+2}"] = {
-                    temp_sites_struct[site]['_atom_site_labels'][i]: temp_sites_struct[site]['_anisotropic_factors'][i] for i in range(len(temp_sites_struct[site]['_anisotropic_factors']))
+            if any([len(x) > 0 for x in site_data['_anisotropic_factors']]):
+                anisotropic_displacements[label] = {
+                    site_data['_atom_site_labels'][i]: site_data['_anisotropic_factors'][i] for i in range(len(site_data['_anisotropic_factors']))
                 }
+
+            site_uncertainties[label] = site_data['_uncertainties']
 
     # Check the structure features flag by seeing if any site has disorder
     structure_features = []
@@ -285,7 +310,7 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
             structure_features.append("disorder")
             break
 
-    return species_list, species_at_sites, fractional_sites, cartesian_sites, cell.tolist(), structure_features, anisotropic_displacements, cell_uncertainties
+    return species_list, species_at_sites, fractional_sites, cartesian_sites, cell.tolist(), structure_features, anisotropic_displacements, cell_uncertainties, site_uncertainties
 
 
 def _get_reference_fields(pycifrw_structure: CifFile, id: str) -> {str: Any}:
@@ -373,14 +398,11 @@ def from_pycifrw(pycifrw_structure: CifFile, id: Union[None, str] = None) -> Str
         attributes['cartesian_site_positions'], 
         attributes["lattice_vectors"],
         attributes["structure_features"],
-        anisotropic_displacements,
-        cell_uncertainties
+        attributes["anisotropic_displacements"],
+        attributes["cell_uncertainties"],
+        attributes["site_uncertainties"]
     ) = _get_species_enumerated(pycfrw_d)
 
-    if len(anisotropic_displacements) > 0:
-        attributes["anisotropic_displacements"] = anisotropic_displacements
-    
-    attributes["cell_uncertainties"] = cell_uncertainties
     attributes['nsites'] = len(attributes['fractional_site_positions'])
 
     (
