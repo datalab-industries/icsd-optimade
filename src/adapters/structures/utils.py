@@ -16,11 +16,11 @@ class UncertainFloat(BaseModel):
         ) -> None:
 
         if isinstance(value, str):
-            value, uncertainty = self._cast_real_str__to_uncertain_float(value)
+            value, uncertainty = self._cast_real_str_to_uncertain_float(value)
 
         super().__init__(value=value, uncertainty=uncertainty)
 
-    def _cast_real_str__to_uncertain_float(self, value: str) -> (float, float):
+    def _cast_real_str_to_uncertain_float(self, value: str) -> (float, float):
         if "(" in value:
             base, uncertainty = value.split("(")
             uncertainty = uncertainty.rstrip(")")

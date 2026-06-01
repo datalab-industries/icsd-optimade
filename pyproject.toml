@@ -29,6 +29,7 @@ dependencies = [
     "pymongo >= 4, < 5",
     "ase >= 3.26.0",
     "pycifrw >= 5.0.1",
+    "pymatgen>=2026.5.4",
 ]
 
 [project.scripts]
