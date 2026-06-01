@@ -105,13 +105,59 @@ def _get_elements_ratios(pycifrw_structure: CifFile) -> list[str, int, float]:
 
     return elements, elements_ratios, n_elements, formula_string, chemical_formula_reduced
 
+def _get_anisotropic_factors(pycifrw_structure: CifFile, atom_site_label: str) -> dict[str, Any]:
+    if any(key in pycifrw_structure for key in ["_atom_site_aniso_U_11", "_atom_site_aniso_B_11", "_atom_site_aniso_beta_11"]):
+        try:
+            i = pycifrw_structure["_atom_site_aniso_label"].index(atom_site_label)
+        except ValueError:
+            return {}
+    else:
+        return {}
+
+    if "_atom_site_aniso_U_11" in pycifrw_structure:
+        return {
+                "_anisotropic_U_factors": {
+                                '_atom_site_aniso_U_11': pycifrw_structure["_atom_site_aniso_U_11"][i], 
+                                '_atom_site_aniso_U_22': pycifrw_structure["_atom_site_aniso_U_22"][i], 
+                                '_atom_site_aniso_U_33': pycifrw_structure["_atom_site_aniso_U_33"][i], 
+                                '_atom_site_aniso_U_12': pycifrw_structure["_atom_site_aniso_U_12"][i], 
+                                '_atom_site_aniso_U_13': pycifrw_structure["_atom_site_aniso_U_13"][i], 
+                                '_atom_site_aniso_U_23': pycifrw_structure["_atom_site_aniso_U_23"][i]
+                    }
+                }
+        # TODO cast from string to float and store the uncertainties as another field
+    elif "_atom_site_aniso_B_11" in pycifrw_structure:
+        return {
+            "_anisotropic_B_factors": {
+                        '_atom_site_aniso_B_11': pycifrw_structure["_atom_site_aniso_B_11"][i], 
+                        '_atom_site_aniso_B_22': pycifrw_structure["_atom_site_aniso_B_22"][i], 
+                        '_atom_site_aniso_B_33': pycifrw_structure["_atom_site_aniso_B_33"][i], 
+                        '_atom_site_aniso_B_12': pycifrw_structure["_atom_site_aniso_B_12"][i], 
+                        '_atom_site_aniso_B_13': pycifrw_structure["_atom_site_aniso_B_13"][i], 
+                        '_atom_site_aniso_B_23': pycifrw_structure["_atom_site_aniso_B_23"][i]
+                }
+            }
+    elif "_atom_site_aniso_beta_11" in pycifrw_structure:
+        return {
+            "_anisotropic_beta_factors": {
+                        '_atom_site_aniso_beta_11': pycifrw_structure["_atom_site_aniso_beta_11"][i], 
+                        '_atom_site_aniso_beta_22': pycifrw_structure["_atom_site_aniso_beta_22"][i], 
+                        '_atom_site_aniso_beta_33': pycifrw_structure["_atom_site_aniso_beta_33"][i], 
+                        '_atom_site_aniso_beta_12': pycifrw_structure["_atom_site_aniso_beta_12"][i], 
+                        '_atom_site_aniso_beta_13': pycifrw_structure["_atom_site_aniso_beta_13"][i], 
+                        '_atom_site_aniso_beta_23': pycifrw_structure["_atom_site_aniso_beta_23"][i]
+                }
+            }
+
 
 def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeStructureSpecies], np.ndarray]:
     ''' Get the species from the atom site type symbols '''
 
     species_list = []
+    aniso_displacements_flag = False
     
-    for i, (symbol, concentration, x, y, z) in enumerate(zip(pycifrw_structure["_atom_site_label"], 
+    for i, (atom_site_label, concentration, x, y, z) in enumerate(zip(
+                                                pycifrw_structure["_atom_site_label"], 
                                                 pycifrw_structure["_atom_site_occupancy"],
                                                 pycifrw_structure["_atom_site_fract_x"],
                                                 pycifrw_structure["_atom_site_fract_y"],
@@ -119,53 +165,19 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
         
         # Cast any Deuterium or Tritium symbols to Hydrogen
         # Use regex to switch D or T exactly, leaving trailing digits intact and skipping Dy etc. 
-        symbol = re.sub(r"(D|T)(?![a-z])", "H", symbol)
+        symbol = re.sub(r"(D|T)(?![a-z])", "H", atom_site_label)
 
         species = [symbol, 
                     _strip_uncertainty(concentration), 
                     (_strip_uncertainty(x), _strip_uncertainty(y), _strip_uncertainty(z))]
 
-        aniso_displacements_flag = False
+        
+        aniso_factors = _get_anisotropic_factors(pycifrw_structure, atom_site_label)
+        species.append(aniso_factors)
+        species.append(atom_site_label)
 
-        if "_atom_site_aniso_U_11" in pycifrw_structure:
-            species.append({
-                "_anisotropic_u_factors": {
-                                'U11': pycifrw_structure["_atom_site_aniso_U_11"][i], 
-                                'U22': pycifrw_structure["_atom_site_aniso_U_22"][i], 
-                                'U33': pycifrw_structure["_atom_site_aniso_U_33"][i], 
-                                'U12': pycifrw_structure["_atom_site_aniso_U_12"][i], 
-                                'U13': pycifrw_structure["_atom_site_aniso_U_13"][i], 
-                                'U23': pycifrw_structure["_atom_site_aniso_U_23"][i]
-                    }
-                })
+        if len(aniso_factors) > 0:
             aniso_displacements_flag = True
-        # TODO cast from string to float and store the uncertainties as another field
-        elif "_atom_site_aniso_B_11" in pycifrw_structure:
-            species.append({
-                "_anisotropic_b_factors": {
-                            'B11': pycifrw_structure["_atom_site_aniso_B_11"][i], 
-                            'B22': pycifrw_structure["_atom_site_aniso_B_22"][i], 
-                            'B33': pycifrw_structure["_atom_site_aniso_B_33"][i], 
-                            'B12': pycifrw_structure["_atom_site_aniso_B_12"][i], 
-                            'B13': pycifrw_structure["_atom_site_aniso_B_13"][i], 
-                            'B23': pycifrw_structure["_atom_site_aniso_B_23"][i]
-                    }
-                }) 
-            aniso_displacements_flag = True
-        elif "_atom_site_aniso_beta_11" in pycifrw_structure:
-            species.append({
-                "_anisotropic_beta_factors": {
-                            'beta11': pycifrw_structure["_atom_site_aniso_beta_11"][i], 
-                            'beta22': pycifrw_structure["_atom_site_aniso_beta_22"][i], 
-                            'beta33': pycifrw_structure["_atom_site_aniso_beta_33"][i], 
-                            'beta12': pycifrw_structure["_atom_site_aniso_beta_12"][i], 
-                            'beta13': pycifrw_structure["_atom_site_aniso_beta_13"][i], 
-                            'beta23': pycifrw_structure["_atom_site_aniso_beta_23"][i]
-                    }
-                })
-            aniso_displacements_flag = True
-        else:
-            species.append(None)
 
         species_list.append(species)
 
@@ -173,13 +185,15 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
     temp_sites_struct = defaultdict(lambda: {
         "symbols": [],
         "concentrations": [],
-        "_anisotropic_factors": []
+        "_anisotropic_factors": [],
+        "_atom_site_labels": []
     })
 
-    for symbol, concentration, xyz, aniso_factors in species_list:
+    for symbol, concentration, xyz, aniso_factors, atom_site_label in species_list:
         temp_sites_struct[xyz]["symbols"].append(_strip_atom_symbol(symbol))
         temp_sites_struct[xyz]["concentrations"].append(concentration)
         temp_sites_struct[xyz]["_anisotropic_factors"].append(aniso_factors)
+        temp_sites_struct[xyz]["_atom_site_labels"].append(atom_site_label)
 
     # Calculate the concentrations of any vacancy symbols 
     for site, site_data in temp_sites_struct.items():
@@ -237,7 +251,9 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
 
         if aniso_displacements_flag:
             k = list(temp_sites_struct[site]['_anisotropic_factors'][0].keys())[0]
-            anisotropic_displacements[f"{temp_sites_struct[site]['label']}_1"] = temp_sites_struct[site]['_anisotropic_factors'][0][k]
+            anisotropic_displacements[f"{temp_sites_struct[site]['label']}_1"] = {
+                temp_sites_struct[site]['_atom_site_labels'][i]: temp_sites_struct[site]['_anisotropic_factors'][i] for i in range(len(temp_sites_struct[site]['_anisotropic_factors']))
+            }
 
         for i, equivalent_site in enumerate(temp_sites_struct[site]["equivalent_sites"]):
             fractional_sites.append(equivalent_site)
@@ -251,7 +267,9 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
             )
 
             if aniso_displacements_flag:
-                anisotropic_displacements[f"{temp_sites_struct[site]['label']}_{i+2}"] = temp_sites_struct[site]['_anisotropic_factors'][0][k]
+                anisotropic_displacements[f"{temp_sites_struct[site]['label']}_{i+2}"] = {
+                    temp_sites_struct[site]['_atom_site_labels'][i]: temp_sites_struct[site]['_anisotropic_factors'][i] for i in range(len(temp_sites_struct[site]['_anisotropic_factors']))
+                }
 
     # Check the structure features flag by seeing if any site has disorder
     structure_features = []
