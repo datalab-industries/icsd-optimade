@@ -1,17 +1,12 @@
-import datetime
 import json
 from io import BytesIO
 from pathlib import Path
 
-import ase.io
 import CifFile
-from optimade.adapters import Reference, Structure
-from optimade.models import Person
 
-from adapters.structures.pycifrw import from_pycifrw
-
+from .adapters.structures.pycifrw import from_pycifrw
 from .client import ICSDClient
-from .utils import get_cif, uncertain_float
+from .utils import get_cif
 
 
 def map_cif_to_optimade(
