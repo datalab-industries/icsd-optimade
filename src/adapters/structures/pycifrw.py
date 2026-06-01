@@ -17,6 +17,8 @@ from optimade.models import StructureResource as OptimadeStructure
 from optimade.models import StructureResourceAttributes, Person
 from optimade.models.utils import anonymize_formula, reduce_formula, _reduce_or_anonymize_formula
 
+from optimade.adapters.structures.utils import UncertainFloat
+
 from CifFile.CifFile_module import CifFile
 from ase.cell import Cell
 from ase.spacegroup import Spacegroup
@@ -117,35 +119,34 @@ def _get_anisotropic_factors(pycifrw_structure: CifFile, atom_site_label: str) -
     if "_atom_site_aniso_U_11" in pycifrw_structure:
         return {
                 "_anisotropic_U_factors": {
-                                '_atom_site_aniso_U_11': pycifrw_structure["_atom_site_aniso_U_11"][i], 
-                                '_atom_site_aniso_U_22': pycifrw_structure["_atom_site_aniso_U_22"][i], 
-                                '_atom_site_aniso_U_33': pycifrw_structure["_atom_site_aniso_U_33"][i], 
-                                '_atom_site_aniso_U_12': pycifrw_structure["_atom_site_aniso_U_12"][i], 
-                                '_atom_site_aniso_U_13': pycifrw_structure["_atom_site_aniso_U_13"][i], 
-                                '_atom_site_aniso_U_23': pycifrw_structure["_atom_site_aniso_U_23"][i]
+                                '_atom_site_aniso_U_11': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_11"][i]), 
+                                '_atom_site_aniso_U_22': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_22"][i]), 
+                                '_atom_site_aniso_U_33': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_33"][i]), 
+                                '_atom_site_aniso_U_12': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_12"][i]), 
+                                '_atom_site_aniso_U_13': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_13"][i]), 
+                                '_atom_site_aniso_U_23': UncertainFloat(pycifrw_structure["_atom_site_aniso_U_23"][i]), 
                     }
                 }
-        # TODO cast from string to float and store the uncertainties as another field
     elif "_atom_site_aniso_B_11" in pycifrw_structure:
         return {
             "_anisotropic_B_factors": {
-                        '_atom_site_aniso_B_11': pycifrw_structure["_atom_site_aniso_B_11"][i], 
-                        '_atom_site_aniso_B_22': pycifrw_structure["_atom_site_aniso_B_22"][i], 
-                        '_atom_site_aniso_B_33': pycifrw_structure["_atom_site_aniso_B_33"][i], 
-                        '_atom_site_aniso_B_12': pycifrw_structure["_atom_site_aniso_B_12"][i], 
-                        '_atom_site_aniso_B_13': pycifrw_structure["_atom_site_aniso_B_13"][i], 
-                        '_atom_site_aniso_B_23': pycifrw_structure["_atom_site_aniso_B_23"][i]
+                        '_atom_site_aniso_B_11': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_11"][i]),
+                        '_atom_site_aniso_B_22': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_22"][i]),
+                        '_atom_site_aniso_B_33': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_33"][i]),
+                        '_atom_site_aniso_B_12': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_12"][i]),
+                        '_atom_site_aniso_B_13': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_13"][i]),
+                        '_atom_site_aniso_B_23': UncertainFloat(pycifrw_structure["_atom_site_aniso_B_23"][i])
                 }
             }
     elif "_atom_site_aniso_beta_11" in pycifrw_structure:
         return {
             "_anisotropic_beta_factors": {
-                        '_atom_site_aniso_beta_11': pycifrw_structure["_atom_site_aniso_beta_11"][i], 
-                        '_atom_site_aniso_beta_22': pycifrw_structure["_atom_site_aniso_beta_22"][i], 
-                        '_atom_site_aniso_beta_33': pycifrw_structure["_atom_site_aniso_beta_33"][i], 
-                        '_atom_site_aniso_beta_12': pycifrw_structure["_atom_site_aniso_beta_12"][i], 
-                        '_atom_site_aniso_beta_13': pycifrw_structure["_atom_site_aniso_beta_13"][i], 
-                        '_atom_site_aniso_beta_23': pycifrw_structure["_atom_site_aniso_beta_23"][i]
+                        '_atom_site_aniso_beta_11': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_11"][i]),
+                        '_atom_site_aniso_beta_22': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_22"][i]),
+                        '_atom_site_aniso_beta_33': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_33"][i]),
+                        '_atom_site_aniso_beta_12': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_12"][i]),
+                        '_atom_site_aniso_beta_13': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_13"][i]),
+                        '_atom_site_aniso_beta_23': UncertainFloat(pycifrw_structure["_atom_site_aniso_beta_23"][i])
                 }
             }
 
