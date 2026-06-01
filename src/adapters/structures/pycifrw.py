@@ -200,16 +200,20 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
                 UncertainFloat(z).uncertainty])
 
         cartesian_uncertainty_tensor = cell.cartesian_positions(fractional_uncertainty_tensor)
-        
-        species.append({
-            f"{atom_site_label}_x_fractional": fractional_uncertainty_tensor[0],
-            f"{atom_site_label}_y_fractional": fractional_uncertainty_tensor[1],
-            f"{atom_site_label}_z_fractional": fractional_uncertainty_tensor[2],
-            f"{atom_site_label}_x_cartesian": cartesian_uncertainty_tensor[0],
-            f"{atom_site_label}_y_cartesian": cartesian_uncertainty_tensor[1],
-            f"{atom_site_label}_z_cartesian": cartesian_uncertainty_tensor[2],
-        })
 
+        if sum(fractional_uncertainty_tensor) > 0:
+            site_uncertainties = {
+                f"{atom_site_label}_x_fractional": float(fractional_uncertainty_tensor[0]),
+                f"{atom_site_label}_y_fractional": float(fractional_uncertainty_tensor[1]),
+                f"{atom_site_label}_z_fractional": float(fractional_uncertainty_tensor[2]),
+                f"{atom_site_label}_x_cartesian": float(cartesian_uncertainty_tensor[0]),
+                f"{atom_site_label}_y_cartesian": float(cartesian_uncertainty_tensor[1]),
+                f"{atom_site_label}_z_cartesian": float(cartesian_uncertainty_tensor[2]),
+            }
+        else:
+            site_uncertainties = {}
+
+        species.append(site_uncertainties)
         species_list.append(species)
 
     # For each of the site coordinates, we need to calculate the atomic label 
@@ -280,8 +284,9 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
             anisotropic_displacements[label] = {
                 site_data['_atom_site_labels'][i]: site_data['_anisotropic_factors'][i] for i in range(len(site_data['_anisotropic_factors']))
             }
-
-        site_uncertainties[label] = site_data['_uncertainties']
+        
+        if any([len(x) > 0 for x in site_data['_uncertainties']]):
+            site_uncertainties[label] = site_data['_uncertainties']
 
         for i, equivalent_site in enumerate(site_data["equivalent_sites"]):
             label = site_data['label'] + f'_{i+2}'
@@ -299,8 +304,9 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
                 anisotropic_displacements[label] = {
                     site_data['_atom_site_labels'][i]: site_data['_anisotropic_factors'][i] for i in range(len(site_data['_anisotropic_factors']))
                 }
-
-            site_uncertainties[label] = site_data['_uncertainties']
+        
+            if any([len(x) > 0 for x in site_data['_uncertainties']]):
+                site_uncertainties[label] = site_data['_uncertainties']
 
     # Check the structure features flag by seeing if any site has disorder
     structure_features = []
