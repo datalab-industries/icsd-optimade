@@ -16,11 +16,12 @@ Note:
 
 This conversion function relies on the [NumPy](https://numpy.org/) library.
 """
-import re
-from typing import Union 
-from io import BytesIO
-import CifFile
 
+import re
+from io import BytesIO
+from typing import Union
+
+import CifFile
 from optimade.adapters.structures.pycifrw import from_pycifrw
 from optimade.adapters.structures.utils import (
     cell_to_cellpar,
@@ -157,26 +158,41 @@ def get_cif(
 
     return cif
 
-def from_cif(cif_string: Union[bytes, str], 
-             fp: bool=False,
-             id: Union[None, str] = None) -> StructureResourceAttributes:
+
+def from_cif(
+    cif_string: Union[bytes, str], fp: bool = False, id: Union[None, str] = None
+) -> StructureResourceAttributes:
     """Create an OPTIMADE structure from a cif file string.
 
     This function will return an OPTIMADE structure based on the cif file string.
+
+    Parameters:
+    -----------
+        cif_string: The cif file as a string or bytes, or the filepath to the cif file if `fp` is set to True.
+        fp: Whether the cif_string is a file path (default: False).
+        id: The id to use for the structure (default: None).
+    Returns:
+    --------
+        An OPTIMADE structure based on the cif file string.
+
     """
+
     if fp:
-        with open(cif_string, 'rb') as f:
+        with open(cif_string, "rb") as f:
             cif_bytes = f.read()
     else:
-        cif_bytes = cif_string
+        if isinstance(cif_string, str):
+            cif_bytes = cif_string.encode("utf-8", errors="ignore")
+        else:
+            cif_bytes = cif_string
 
-    if 'Unauthorized' in str(cif_bytes):
-        raise Exception('Unauthorized')
+    if "Unauthorized" in str(cif_bytes):
+        raise Exception("Unauthorized")
 
-    cif_bytes = cif_bytes.decode('utf-8', errors='ignore')
+    cif_string = cif_bytes.decode("utf-8", errors="ignore")
 
     # Catch bug where latex in titles/formulae throws an error
-    cif_bytes = re.sub(r'\$', '', cif_bytes)
+    cif_string = re.sub(r"\$", "", cif_string)
 
     # Catch bug where multiline fields split by ; aren't caught correctly by PyCIFRW
     def repl(match):
@@ -185,45 +201,38 @@ def from_cif(cif_string: Union[bytes, str],
 
         # flatten whitespace/newlines
         value = " ".join(value.split())
-        
+
         # CIF escaping for single-quoted strings
         value = value.replace("'", "")
 
         return f"{key} '{value}'"
-    
+
     # cast single line ; delimiters to ' and ' delimiters
-    cif_bytes = re.sub(
-        r'(?ms)^(_\S+)\s*\n\s*;\s*\n(.*?)\n;\s*$',
-        repl,
-        cif_bytes
-    )
+    cif_string = re.sub(r"(?ms)^(_\S+)\s*\n\s*;\s*\n(.*?)\n;\s*$", repl, cif_string)
 
     # Remove any breaking apostrophes from _chemical_name_common
-    cif_bytes = re.sub(
-        r'^(_chemical_name_common)\s+([^\n]*)',
-        lambda m: (
-            m.group(1) + ' ' + "'" + m.group(2).replace("'", '') + "'"
-        ),
-        cif_bytes,
-        flags=re.MULTILINE
+    cif_string = re.sub(
+        r"^(_chemical_name_common)\s+([^\n]*)",
+        lambda m: m.group(1) + " " + "'" + m.group(2).replace("'", "") + "'",
+        cif_string,
+        flags=re.MULTILINE,
     )
 
-    # Remove any breaking apostrophes from _chemical_name_common
-    cif_bytes = re.sub(
-        r'^(_chemical_name_structure_type)\s+([^\n]*)',
-        lambda m: (
-            m.group(1) + ' ' + "'" + m.group(2).replace("'", '') + "'"
-        ),
-        cif_bytes,
-        flags=re.MULTILINE
+    # Remove any breaking apostrophes from _chemical_name_structure_type
+    cif_string = re.sub(
+        r"^(_chemical_name_structure_type)\s+([^\n]*)",
+        lambda m: m.group(1) + " " + "'" + m.group(2).replace("'", "") + "'",
+        cif_string,
+        flags=re.MULTILINE,
     )
 
-    cif_bytes = cif_bytes.encode('ascii', errors='ignore')
-    cif_bytes += b'\x1a'
+    # Fix pycifrw encoding bugs
+    cif_bytes = cif_string.encode("ascii", errors="ignore")
+    cif_bytes += b"\x1a"
 
     try:
-        with BytesIO(cif_bytes) as fp:
-            pycifrw_dct = CifFile.ReadCif(fp)
+        with BytesIO(cif_bytes) as bytestream:
+            pycifrw_dct = CifFile.ReadCif(bytestream)
     except Exception as e:
         raise RuntimeError(f"Unable to read CIF: {e}")
 

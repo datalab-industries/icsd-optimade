@@ -41,18 +41,14 @@ def map_cif_to_optimade(
     references = structure.attributes.pop("references")
 
     root_block_key = pycifrw_dct.keys()[0]
-    cif_id = root_block_key.split("-icsd")[0].split('data_')[1]
+    cif_id = root_block_key.split("-icsd")[0].split("data_")[1]
 
     entry["relationships"] = {
-        'references': {
-            'data': [{
-                'id': f"{cif_id}-{i}",
-                'type': 'references'
-            }]
-        } for i in range(len(references))
+        "references": {"data": [{"id": f"{cif_id}-{i}", "type": "references"}]}
+        for i in range(len(references))
     }
 
-    for i,reference in enumerate(references):
+    for i, reference in enumerate(references):
         reference["id"] = f"{cif_id}-{i}"
 
     return f"{json.dumps(entry)}\n{[x.entry.model_dump_json() for x in references]}"
