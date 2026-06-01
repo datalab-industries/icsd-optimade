@@ -7,14 +7,14 @@ to and from a standard pycifrw CifFile object.
 from collections import Counter, defaultdict
 import math
 import re
-from typing import Union
+from typing import Any, Union
 import CifFile
 import numpy as np
+from optimade.adapters import Reference
 from optimade.models import StructureResource
-
 from optimade.models import Species as OptimadeStructureSpecies
 from optimade.models import StructureResource as OptimadeStructure
-from optimade.models import StructureResourceAttributes
+from optimade.models import StructureResourceAttributes, Person
 from optimade.models.utils import anonymize_formula, reduce_formula, _reduce_or_anonymize_formula
 
 from CifFile.CifFile_module import CifFile
@@ -111,29 +111,75 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
 
     species_list = []
     
-    for symbol, concentration, x, y, z in zip(pycifrw_structure["_atom_site_label"], 
+    for i, (symbol, concentration, x, y, z) in enumerate(zip(pycifrw_structure["_atom_site_label"], 
                                                 pycifrw_structure["_atom_site_occupancy"],
                                                 pycifrw_structure["_atom_site_fract_x"],
                                                 pycifrw_structure["_atom_site_fract_y"],
-                                                pycifrw_structure["_atom_site_fract_z"]):
+                                                pycifrw_structure["_atom_site_fract_z"])):
         
         # Cast any Deuterium or Tritium symbols to Hydrogen
         # Use regex to switch D or T exactly, leaving trailing digits intact and skipping Dy etc. 
         symbol = re.sub(r"(D|T)(?![a-z])", "H", symbol)
 
-        species_list.append([symbol, 
-                            _strip_uncertainty(concentration), 
-                            (_strip_uncertainty(x), _strip_uncertainty(y), _strip_uncertainty(z))])
+        species = [symbol, 
+                    _strip_uncertainty(concentration), 
+                    (_strip_uncertainty(x), _strip_uncertainty(y), _strip_uncertainty(z))]
+
+        aniso_displacements_flag = False
+
+        if "_atom_site_aniso_U_11" in pycifrw_structure:
+            species.append({
+                "_anisotropic_u_factors": {
+                                'U11': pycifrw_structure["_atom_site_aniso_U_11"][i], 
+                                'U22': pycifrw_structure["_atom_site_aniso_U_22"][i], 
+                                'U33': pycifrw_structure["_atom_site_aniso_U_33"][i], 
+                                'U12': pycifrw_structure["_atom_site_aniso_U_12"][i], 
+                                'U13': pycifrw_structure["_atom_site_aniso_U_13"][i], 
+                                'U23': pycifrw_structure["_atom_site_aniso_U_23"][i]
+                    }
+                })
+            aniso_displacements_flag = True
+        # TODO cast from string to float and store the uncertainties as another field
+        elif "_atom_site_aniso_B_11" in pycifrw_structure:
+            species.append({
+                "_anisotropic_b_factors": {
+                            'B11': pycifrw_structure["_atom_site_aniso_B_11"][i], 
+                            'B22': pycifrw_structure["_atom_site_aniso_B_22"][i], 
+                            'B33': pycifrw_structure["_atom_site_aniso_B_33"][i], 
+                            'B12': pycifrw_structure["_atom_site_aniso_B_12"][i], 
+                            'B13': pycifrw_structure["_atom_site_aniso_B_13"][i], 
+                            'B23': pycifrw_structure["_atom_site_aniso_B_23"][i]
+                    }
+                }) 
+            aniso_displacements_flag = True
+        elif "_atom_site_aniso_beta_11" in pycifrw_structure:
+            species.append({
+                "_anisotropic_beta_factors": {
+                            'beta11': pycifrw_structure["_atom_site_aniso_beta_11"][i], 
+                            'beta22': pycifrw_structure["_atom_site_aniso_beta_22"][i], 
+                            'beta33': pycifrw_structure["_atom_site_aniso_beta_33"][i], 
+                            'beta12': pycifrw_structure["_atom_site_aniso_beta_12"][i], 
+                            'beta13': pycifrw_structure["_atom_site_aniso_beta_13"][i], 
+                            'beta23': pycifrw_structure["_atom_site_aniso_beta_23"][i]
+                    }
+                })
+            aniso_displacements_flag = True
+        else:
+            species.append(None)
+
+        species_list.append(species)
 
     # For each of the site coordinates, we need to calculate the atomic label 
     temp_sites_struct = defaultdict(lambda: {
         "symbols": [],
-        "concentrations": []
+        "concentrations": [],
+        "_anisotropic_factors": []
     })
 
-    for symbol, concentration, xyz in species_list:
+    for symbol, concentration, xyz, aniso_factors in species_list:
         temp_sites_struct[xyz]["symbols"].append(_strip_atom_symbol(symbol))
         temp_sites_struct[xyz]["concentrations"].append(concentration)
+        temp_sites_struct[xyz]["_anisotropic_factors"].append(aniso_factors)
 
     # Calculate the concentrations of any vacancy symbols 
     for site, site_data in temp_sites_struct.items():
@@ -164,6 +210,7 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
     species_at_sites = []
     species_list = []
     fractional_sites = []
+    anisotropic_displacements = {}
 
     # Use ase cell to convert the fractional coordinates to cartesian coordinates
     cartesian_sites = []
@@ -188,6 +235,10 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
                                     concentration=temp_sites_struct[site]['concentrations'])
         ) 
 
+        if aniso_displacements_flag:
+            k = list(temp_sites_struct[site]['_anisotropic_factors'][0].keys())[0]
+            anisotropic_displacements[f"{temp_sites_struct[site]['label']}_1"] = temp_sites_struct[site]['_anisotropic_factors'][0][k]
+
         for i, equivalent_site in enumerate(temp_sites_struct[site]["equivalent_sites"]):
             fractional_sites.append(equivalent_site)
             cart_coords = cell.cartesian_positions(np.array(equivalent_site).reshape(-1, 3))
@@ -199,6 +250,9 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
                                         concentration=temp_sites_struct[site]['concentrations'])
             )
 
+            if aniso_displacements_flag:
+                anisotropic_displacements[f"{temp_sites_struct[site]['label']}_{i+2}"] = temp_sites_struct[site]['_anisotropic_factors'][0][k]
+
     # Check the structure features flag by seeing if any site has disorder
     structure_features = []
 
@@ -207,7 +261,77 @@ def _get_species_enumerated(pycifrw_structure: CifFile) -> tuple[list[OptimadeSt
             structure_features.append("disorder")
             break
 
-    return species_list, species_at_sites, fractional_sites, cartesian_sites, cell.tolist(), structure_features
+    return species_list, species_at_sites, fractional_sites, cartesian_sites, cell.tolist(), structure_features, anisotropic_displacements
+
+
+def _get_reference_fields(pycifrw_structure: CifFile, id: str) -> {str: Any}:
+    references = []
+    
+    if '_citation_id' in pycifrw_structure:
+        for i, (_citation_id) in enumerate(
+                    pycifrw_structure['_citation_id']):
+            if '_citation_journal_full' in pycifrw_structure:
+                journal = pycifrw_structure['_citation_journal_full'][i]
+            elif '_citation_journal_abbrev' in pycifrw_structure:
+                journal = pycifrw_structure['_citation_journal_abbrev'][i]
+            elif '_citation_journal_id_ASTM' in pycifrw_structure:
+                journal = pycifrw_structure['_citation_journal_id_ASTM'][i]
+            else:
+                journal = None
+
+            if '_citation_doi' in pycifrw_structure:
+                doi = pycifrw_structure['_citation_doi'][i]
+            else:
+                doi = None
+
+            if '_citation_year' in pycifrw_structure:
+                year = pycifrw_structure['_citation_year'][i]
+            else:
+                year = None
+
+            if '_citation_title' in pycifrw_structure:
+                title = pycifrw_structure['_citation_title'][i]
+            else:
+                title = None
+
+            if '_audit_creation_date' in pycifrw_structure:
+                last_modified = pycifrw_structure["_audit_creation_date"]
+            elif '_cif_audit_creation_date' in pycifrw_structure:
+                last_modified = pycifrw_structure["_cif_audit_creation_date"]
+            else:
+                last_modified = None
+
+            ref_entry = {
+                "id": _citation_id,
+                "type": "references",
+                "attributes": {
+                    "doi": None,
+                    "last_modified": last_modified,
+                    "authors": [],
+                    "year": year,
+                    "title": title,
+                    "journal": journal,
+                    "doi": doi
+                }
+            }
+
+            references.append({
+                "data": Reference(ref_entry)
+            })
+
+    # Add the author data if available
+    # TODO Person object 
+    if len(references) > 0:
+        authors = []
+        if '_citation_author_citation_id' in pycifrw_structure:
+            for citation_id, author_name in zip(pycifrw_structure['_citation_author_citation_id'], pycifrw_structure['_citation_author_name']):
+                for ref in references:
+                    if ref['data'].entry.id == citation_id:
+                        ref['data'].entry.attributes.authors.append(
+                            Person(name=author_name)
+                        )
+
+    return references
 
 
 def from_pycifrw(pycifrw_structure: CifFile, id: Union[None, str] = None) -> StructureResourceAttributes:
@@ -224,8 +348,12 @@ def from_pycifrw(pycifrw_structure: CifFile, id: Union[None, str] = None) -> Str
         attributes['fractional_site_positions'], 
         attributes['cartesian_site_positions'], 
         attributes["lattice_vectors"],
-        attributes["structure_features"]
+        attributes["structure_features"],
+        anisotropic_displacements
     ) = _get_species_enumerated(pycfrw_d)
+
+    if len(anisotropic_displacements) > 0:
+        attributes["anisotropic_displacements"] = anisotropic_displacements
     
     attributes['nsites'] = len(attributes['fractional_site_positions'])
 
@@ -236,6 +364,8 @@ def from_pycifrw(pycifrw_structure: CifFile, id: Union[None, str] = None) -> Str
         attributes['chemical_formula_descriptive'],
         attributes['chemical_formula_reduced']
     ) = _get_elements_ratios(pycfrw_d)
+
+    attributes['references'] = _get_reference_fields(pycfrw_d, id)
 
     attributes['dimension_types'] = [1, 1, 1]
     attributes['nperiodic_dimensions'] = 3
