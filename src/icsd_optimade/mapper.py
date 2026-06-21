@@ -1,8 +1,8 @@
-import json
 from io import BytesIO
 from pathlib import Path
 
 import CifFile
+from optimade.models import ReferenceResource, StructureResource
 
 from .adapters.structures.pycifrw import from_pycifrw
 from .client import ICSDClient
@@ -39,24 +39,47 @@ def map_cif_to_optimade(
     try:
         with BytesIO(cif_bytes) as fp:
             pycifrw_dct = CifFile.ReadCif(fp)
-            structure = from_pycifrw(pycifrw_dct)
-            entry = structure.entry.model_dump()
+            attributes = from_pycifrw(pycifrw_dct).model_dump()
     except Exception as exc:
         if ignore_errors:
             return exc
         raise exc
 
-    references = structure.attributes.pop("references")
+    references = attributes.pop("references", [])
 
     root_block_key = pycifrw_dct.keys()[0]
-    cif_id = root_block_key.split("-icsd")[0].split("data_")[1]
+    cif_id = root_block_key.split("-icsd")[0].split("data_")[0]
+    attributes["immutable_id"] = cif_id
 
-    entry["relationships"] = {
-        "references": {"data": [{"id": f"{cif_id}-{i}", "type": "references"}]}
-        for i in range(len(references))
-    }
+    references = [
+        ReferenceResource(
+            **{
+                "attributes": ref["data"].entry.attributes,
+                "type": "references",
+                "id": f"{cif_id}-{i}",
+            }
+        )
+        for i, ref in enumerate(references)
+    ]
 
-    for i, reference in enumerate(references):
-        reference["id"] = f"{cif_id}-{i}"
+    entry = StructureResource(
+        **{
+            "attributes": attributes,
+            "id": str(cif_id),
+            "type": "structures",
+            "relationships": {
+                "references": {
+                    "data": [
+                        {"id": reference.id, "type": "references"}
+                        for reference in references
+                    ]
+                }
+            },
+        }
+    )
 
-    return f"{json.dumps(entry)}\n{[x.entry.model_dump_json() for x in references]}"
+    json_str = entry.model_dump_json()
+    if references:
+        json_str += "\n" + "\n".join(x.model_dump_json() for x in references)
+
+    return json_str
