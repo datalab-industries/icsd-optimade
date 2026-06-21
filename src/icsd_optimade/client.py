@@ -46,15 +46,17 @@ class ICSDClient:
         if lock.is_file():
             lock.unlink()
 
-        if not self.icsd_login_id or not self.icsd_login_password:
-            raise RuntimeError(
-                "No ICSD user credentials found, please set the `ICSD_LOGIN_ID` and `ICSD_LOGIN_PASSWORD` environment variables."
+        if self.icsd_login_id and self.icsd_login_password:
+            self.login()
+        else:
+            self.log.warning(
+                "ICSD login credentials not found in environment variables. "
+                "CIF download will not be possible."
             )
 
         self.headers["User-Agent"] = (
             f"icsd-optimade ingester/{__version__} Contact dev@datalab.industries with issues/problematic usage"
         )
-        self.login()
 
     def __enter__(self):
         return self
@@ -63,6 +65,9 @@ class ICSDClient:
         self.logout()
 
     def logout(self):
+        if self._session is None:
+            return
+
         self.headers.pop("Accept", None)
         logout_resp = self.session.get(f"{self.base_url}/auth/logout")
         if logout_resp.status_code != 200:
