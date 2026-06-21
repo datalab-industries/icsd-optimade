@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 
-def test_ingest(tmpdir):
+def test_ingest(tmpdir, icsd_credentials, icsd_client):
     from icsd_optimade.ingest import ingest_by_year
 
     # Symlink any cached cifs from main data dir
