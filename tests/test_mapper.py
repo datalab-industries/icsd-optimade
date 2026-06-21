@@ -4,10 +4,13 @@ import json
 from optimade.models import ReferenceResource, StructureResource
 
 
-def test_cif_mapper_111000(icsd_client):
+def test_cif_mapper_111000(icsd_client, data_dir):
     from icsd_optimade.ingest import map_cif_to_optimade
 
-    json_str = map_cif_to_optimade(111000, icsd_client)
+    json_str = map_cif_to_optimade(
+        111000, icsd_client, data_dir=data_dir, download=False
+    )
+    assert isinstance(json_str, str)
 
     struc_dct = json.loads(json_str.split("\n")[0])
     ref_dct = json.loads(json_str.split("\n")[1])
@@ -27,10 +30,11 @@ def test_cif_mapper_111000(icsd_client):
     assert structure.relationships.references.data[0].id == "604000"
 
 
-def test_cif_mapper_86_115(icsd_client):
+def test_cif_mapper_86_115(icsd_client, data_dir):
     from icsd_optimade.ingest import map_cif_to_optimade
 
-    json_str = map_cif_to_optimade(86, icsd_client)
+    json_str = map_cif_to_optimade(86, icsd_client, data_dir=data_dir, download=False)
+    assert isinstance(json_str, str)
 
     struc_dct = json.loads(json_str.split("\n")[0])
     ref_dct = json.loads(json_str.split("\n")[1])
@@ -73,10 +77,13 @@ def test_cif_mapper_86_115(icsd_client):
     assert reference.attributes.title == "Zur Kenntnis von Ba3 Cu2 O4 Cl2"
 
 
-def test_cif_mapper_80213_105101(icsd_client):
+def test_cif_mapper_80213_105101(icsd_client, data_dir):
     from icsd_optimade.ingest import map_cif_to_optimade
 
-    json_str = map_cif_to_optimade(80213, icsd_client)
+    json_str = map_cif_to_optimade(
+        80213, icsd_client, data_dir=data_dir, download=False
+    )
+    assert isinstance(json_str, str)
 
     struc_dct = json.loads(json_str.split("\n")[0])
     ref_dct = json.loads(json_str.split("\n")[1])

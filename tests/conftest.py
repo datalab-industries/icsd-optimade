@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,11 @@ def icsd_credentials():
 
 
 @pytest.fixture(scope="session")
-def icsd_client(icsd_credentials):
+def icsd_client():
     with ICSDClient() as client:
         yield client
+
+
+@pytest.fixture(scope="session")
+def data_dir():
+    return Path(__file__).parent.parent / "data"
