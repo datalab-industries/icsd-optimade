@@ -10,8 +10,12 @@ from .utils import get_cif
 
 
 def map_cif_to_optimade(
-    entry_id: int, client: ICSDClient, data_dir: Path | None = None
-) -> str | RuntimeError:
+    entry_id: int,
+    client: ICSDClient,
+    data_dir: Path | None = None,
+    download: bool = True,
+    ignore_errors: bool = False,
+) -> str | Exception:
     """For a given ICSD entry ID (CollCode), either look up a cached
     copy of the CIF or download from the ICSD API and map it into an OPTIMADE
     Structure resource via ASE, returning a JSON string of the structure.
@@ -20,6 +24,8 @@ def map_cif_to_optimade(
         entry_id: The ICSD CollCode of the desired structure.
         client: An ICSDClient instance to use for downloading CIF files.
         data_dir: Optional directory to look for cache of CIF files.
+        download: If False, do not attempt to download the CIF if it is not found in the cache.
+        ignore_errors: If True, return a RuntimeError instead of raising an exception if the parsing fails.
 
     Returns:
         A JSONLines string representing the structure and any references, or a RuntimeError if the parsing failed.
@@ -28,7 +34,7 @@ def map_cif_to_optimade(
         Forbidden: If the CIF download failed for rate-limit reasons.
 
     """
-    cif_bytes = get_cif(entry_id, client, data_dir)
+    cif_bytes = get_cif(entry_id, client, data_dir, download=download)
 
     try:
         with BytesIO(cif_bytes) as fp:
@@ -36,7 +42,9 @@ def map_cif_to_optimade(
             structure = from_pycifrw(pycifrw_dct)
             entry = structure.entry.model_dump()
     except Exception as exc:
-        return RuntimeError(f"Unable to convert CIF to ASE atoms: {exc}")
+        if ignore_errors:
+            return exc
+        raise exc
 
     references = structure.attributes.pop("references")
 
