@@ -75,7 +75,12 @@ def store_cif(entry_id: int, cif_bytes: bytes, data_dir: Path | None = None) -> 
             f.write(cif_bytes)
 
 
-def get_cif(entry_id: int, client: "ICSDClient", data_dir: Path | None = None) -> bytes:
+def get_cif(
+    entry_id: int,
+    client: "ICSDClient",
+    data_dir: Path | None = None,
+    download: bool = True,
+) -> bytes:
     """Get the CIF bytes for the given CollCode `entry_id`, either from cache
     or by downloading from the ICSD API.
 
@@ -83,12 +88,19 @@ def get_cif(entry_id: int, client: "ICSDClient", data_dir: Path | None = None) -
         entry_id: The ICSD CollCode of the desired CIF.
         client: An instance of ICSDClient to use for downloading.
         data_dir: Path to the data directory for storing CIFs.
+        download: If False, do not attempt to download the CIF if it is not found in the cache.
 
     """
     cif_bytes = check_cif_cache(entry_id, data_dir)
 
     if not cif_bytes:
-        cif_bytes = client.get_cif(entry_id)
+        if download:
+            cif_bytes = client.get_cif(entry_id)
+        else:
+            raise RuntimeError(
+                f"CIF {entry_id} not found in {data_dir} and {download=}"
+            )
+
         store_cif(entry_id, cif_bytes, data_dir)
 
     return cif_bytes
