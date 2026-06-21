@@ -14,11 +14,12 @@ import numpy as np
 from ase.cell import Cell
 from ase.spacegroup import Spacegroup
 from optimade.adapters import Reference
-from optimade.adapters.structures.utils import UncertainFloat
 from optimade.models import Person, StructureResource, StructureResourceAttributes
 from optimade.models import Species as OptimadeStructureSpecies
 from optimade.models.utils import _reduce_or_anonymize_formula
 from pymatgen.core import Composition
+
+from icsd_optimade.adapters.structures.utils import UncertainFloat
 
 
 def get_pycifrw(optimade_structure: StructureResource) -> CifFile:
