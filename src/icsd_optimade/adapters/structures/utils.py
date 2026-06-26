@@ -1,8 +1,16 @@
+import datetime
 from numbers import Real
 from typing import Union
 
 from pydantic import BaseModel
 from uncertainties import ufloat
+
+
+def isoformat_date(date_str: str | None) -> str | None:
+    if date_str is None:
+        return None
+
+    return datetime.datetime.fromisoformat(date_str).isoformat()
 
 
 class UncertainFloat(BaseModel):

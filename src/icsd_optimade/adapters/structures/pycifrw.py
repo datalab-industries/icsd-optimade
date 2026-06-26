@@ -19,7 +19,7 @@ from optimade.models import Species as OptimadeStructureSpecies
 from optimade.models.utils import _reduce_or_anonymize_formula
 from pymatgen.core import Composition
 
-from icsd_optimade.adapters.structures.utils import UncertainFloat
+from icsd_optimade.adapters.structures.utils import UncertainFloat, isoformat_date
 
 
 def get_pycifrw(optimade_structure: StructureResource) -> CifFile:
@@ -82,6 +82,11 @@ def _get_elements_ratios(
     else:
         formula_string = pycifrw_structure["_chemical_formula_structural"]
 
+    if "_chemical_formula_structural" in pycifrw_structure:
+        descriptive_formula = pycifrw_structure["_chemical_formula_structural"]
+    else:
+        descriptive_formula = formula_string
+
     formula = Composition(formula_string)
 
     el_dict = formula.get_el_amt_dict()
@@ -131,7 +136,7 @@ def _get_elements_ratios(
         elements,
         elements_ratios,
         n_elements,
-        formula_string,
+        descriptive_formula,
         chemical_formula_reduced,
     )
 
@@ -548,16 +553,30 @@ def _get_reference_fields(pycifrw_structure: CifFile) -> list[dict[str, Any]]:
                 year = None
 
             if "_citation_title" in pycifrw_structure:
-                title = pycifrw_structure["_citation_title"][i]
+                if len(pycifrw_structure["_citation_id"]) != len(
+                    pycifrw_structure["_citation_title"]
+                ):
+                    title = (
+                        pycifrw_structure["_citation_title"].replace("\n", " ").strip()
+                    )
+                else:
+                    title = (
+                        pycifrw_structure["_citation_title"][i]
+                        .replace("\n", " ")
+                        .strip()
+                    )
             else:
                 title = None
 
-            if "_audit_creation_date" in pycifrw_structure:
-                last_modified = pycifrw_structure["_audit_creation_date"]
-            elif "_cif_audit_creation_date" in pycifrw_structure:
-                last_modified = pycifrw_structure["_cif_audit_creation_date"]
-            else:
-                last_modified = None
+            # Prefer update date vs creation date for setting last modified
+            last_modified = None
+            date_field_order = ("_audit_creation_date", "_audit_update_record")
+
+            for field in date_field_order:
+                if field in pycifrw_structure:
+                    last_modified = isoformat_date(pycifrw_structure[field])
+                elif f"_cif{field}" in pycifrw_structure:
+                    last_modified = isoformat_date(pycifrw_structure[f"_cif{field}"])
 
             ref_entry = {
                 "id": _citation_id,
@@ -607,7 +626,7 @@ def from_pycifrw(
     An OPTIMADE structure based on the pycifrw StarFile object.
     """
     attributes: StructureResourceAttributes = {}
-    pycfrw_d = pycifrw_structure[pycifrw_structure.keys()[0]]
+    pycifrw_dict = pycifrw_structure[pycifrw_structure.keys()[0]]
 
     (
         attributes["species"],
@@ -619,7 +638,7 @@ def from_pycifrw(
         attributes["anisotropic_displacements"],
         attributes["cell_uncertainties"],
         attributes["site_uncertainties"],
-    ) = _get_species_enumerated(pycfrw_d)
+    ) = _get_species_enumerated(pycifrw_dict)
 
     attributes["nsites"] = len(attributes["fractional_site_positions"])
 
@@ -629,9 +648,9 @@ def from_pycifrw(
         attributes["nelements"],
         attributes["chemical_formula_descriptive"],
         attributes["chemical_formula_reduced"],
-    ) = _get_elements_ratios(pycfrw_d)
+    ) = _get_elements_ratios(pycifrw_dict)
 
-    attributes["references"] = _get_reference_fields(pycfrw_d)
+    attributes["references"] = _get_reference_fields(pycifrw_dict)
 
     attributes["dimension_types"] = [1, 1, 1]
     attributes["nperiodic_dimensions"] = 3
@@ -640,7 +659,25 @@ def from_pycifrw(
         attributes["chemical_formula_reduced"], alphabetize=True, anonymize=True
     )
 
-    attributes["last_modified"] = None
+    attributes["space_group_it_number"] = int(pycifrw_dict["_space_group_IT_number"])
+
+    # Prefer update date vs creation date for setting last modified
+    last_modified = None
+    cdate = None
+    date_field_order = ("_audit_creation_date", "_audit_update_record")
+    for field in date_field_order:
+        if field in pycifrw_dict:
+            last_modified = isoformat_date(pycifrw_dict[field])
+            if "creation" in field:
+                cdate = isoformat_date(pycifrw_dict[field])
+        elif f"_cif{field}" in pycifrw_dict:
+            last_modified = isoformat_date(pycifrw_dict[f"_cif{field}"])
+            if "creation" in field:
+                cdate = isoformat_date(pycifrw_dict[field])
+
+    attributes["last_modified"] = last_modified
+    attributes["_cif_audit_creation_date"] = cdate
+
     attributes["immutable_id"] = id
 
     return StructureResourceAttributes(**attributes)
