@@ -14,25 +14,28 @@ import numpy as np
 from ase.cell import Cell
 from ase.spacegroup import Spacegroup
 from optimade.adapters import Reference
-from optimade.models import Person, StructureResource, StructureResourceAttributes
+from optimade.models import Person, StructureResource
 from optimade.models import Species as OptimadeStructureSpecies
 from optimade.models.utils import _reduce_or_anonymize_formula
 from pymatgen.core import Composition
 
 from icsd_optimade.adapters.structures.utils import UncertainFloat, isoformat_date
+from icsd_optimade.fields import (
+    CifStructureResourceAttributes as StructureResourceAttributes,
+)
 
 
-def get_pycifrw(optimade_structure: StructureResource) -> CifFile:
+def get_pycifrw(optimade_structure: StructureResource) -> CifFile.CifFile:
     """Get pycifrw StarFile object from OPTIMADE structure.
 
-    This function will return a pycifrw StarFile object based on the OPTIMADE structure.
+    This function will return a pycifrw CifFile object based on the OPTIMADE structure.
     """
     # First convert to a pymatgen object to assist in fractional/cartesian mapping
 
     attributes = optimade_structure.attributes.model_dump()
 
     cell = Cell(attributes["lattice_vectors"])
-    pycifrw_structure = CifFile()
+    pycifrw_structure = CifFile.CifFile()
 
     a, b, c = cell.lengths()
     alpha, beta, gamma = cell.angles()
@@ -60,14 +63,14 @@ def _strip_atom_symbol(symbol: str) -> str:
 
 
 def _get_elements_ratios(
-    pycifrw_structure: CifFile,
+    pycifrw_structure: dict,
 ) -> tuple[list[str], list[float], int, str, str]:
     """
     Get the elements ratios from the cif formula
 
     Parameters
     -----------
-    pycifrw_structure: CifFile - The cif structure to extract the elements ratios from
+    pycifrw_structure: dict - The cif structure to extract the elements ratios from
 
     Returns
     -----------
@@ -142,14 +145,14 @@ def _get_elements_ratios(
 
 
 def _get_anisotropic_factors(
-    pycifrw_structure: CifFile, atom_site_label: str
+    pycifrw_structure: dict, atom_site_label: str
 ) -> dict[str, Any]:
     """
     Get the anisotropic factors for a given atom site label from the cif structure, if they exist.
 
     Parameters
     -----------
-    pycifrw_structure: CifFile - The cif structure to extract the anisotropic factors from
+    pycifrw_structure (dict): The cif structure to extract the anisotropic factors from
     atom_site_label: str - The atom site label to extract the anisotropic factors for
 
     Returns
@@ -247,7 +250,7 @@ def _get_anisotropic_factors(
 
 
 def _get_species_enumerated(
-    pycifrw_structure: CifFile,
+    pycifrw_structure: dict,
 ) -> tuple[
     list[OptimadeStructureSpecies],
     list[str],
@@ -266,7 +269,7 @@ def _get_species_enumerated(
 
     Parameters
     -----------
-    pycifrw_structure: CifFile: The pycifrw structure to extract the species data from
+    pycifrw_structure (dict): The pycifrw structure to extract the species data from
 
 
     Returns
@@ -516,12 +519,30 @@ def _get_species_enumerated(
     )
 
 
-def _get_reference_fields(pycifrw_structure: CifFile) -> list[dict[str, Any]]:
+def _get_custom_cif_fields(pycifrw_structure: CifFile.CifFile) -> dict[str, Any]:
+    """Loop through the customised StrucutreResourceAttributes and find
+    _cif namespace fields, then pull them from the unprefixed variants in the
+    pycifrw structure.
+
+    """
+
+    cif_fields = {}
+
+    for field, field_info in StructureResourceAttributes.__fields__.items():
+        if field_info.alias and field_info.alias.startswith("_cif"):
+            cif_fields["_" + field] = pycifrw_structure.get(
+                field.replace("cif_", "_"), None
+            )
+
+    return cif_fields
+
+
+def _get_reference_fields(pycifrw_structure: dict) -> list[dict[str, Any]]:
     """Get the reference fields from the cif file, if they exist.
 
     Parameters:
     -----------
-    pycifrw_structure: CifFile: The pycifrw structure to extract the reference fields from
+    pycifrw_structure: The pycifrw structure to extract the reference fields from
 
     Returns:
     --------
@@ -610,7 +631,7 @@ def _get_reference_fields(pycifrw_structure: CifFile) -> list[dict[str, Any]]:
 
 
 def from_pycifrw(
-    pycifrw_structure: CifFile, id: Union[None, str] = None
+    pycifrw_structure: CifFile.CifFile, id: Union[None, str] = None
 ) -> StructureResourceAttributes:
     """Create an OPTIMADE structure from a pycifrw StarFile object.
 
@@ -625,7 +646,7 @@ def from_pycifrw(
     --------
     An OPTIMADE structure based on the pycifrw StarFile object.
     """
-    attributes: StructureResourceAttributes = {}
+    attributes = {}
     pycifrw_dict = pycifrw_structure[pycifrw_structure.keys()[0]]
 
     (
@@ -652,6 +673,9 @@ def from_pycifrw(
 
     attributes["references"] = _get_reference_fields(pycifrw_dict)
 
+    cif_fields = _get_custom_cif_fields(pycifrw_dict)
+    attributes.update(cif_fields)
+
     attributes["dimension_types"] = [1, 1, 1]
     attributes["nperiodic_dimensions"] = 3
 
@@ -676,8 +700,9 @@ def from_pycifrw(
                 cdate = isoformat_date(pycifrw_dict[field])
 
     attributes["last_modified"] = last_modified
-    attributes["_cif_audit_creation_date"] = cdate
+    attributes["cif_audit_creation_date"] = cdate
 
     attributes["immutable_id"] = id
 
-    return StructureResourceAttributes(**attributes)
+    model = StructureResourceAttributes(**attributes)
+    return model

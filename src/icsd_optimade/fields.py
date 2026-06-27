@@ -3,11 +3,114 @@ borrows heavily from the csd-optimade implementation.
 
 """
 
+import datetime
+
 from optimade import __api_version__
 from optimade import __version__ as __tools_version__
+from optimade.models import StructureResource, StructureResourceAttributes
 from optimade.models.baseinfo import BaseInfoAttributes, BaseInfoResource
+from optimade.models.utils import OptimadeField
+from pydantic import model_validator
 
 from icsd_optimade import __version__
+from icsd_optimade.adapters.structures.utils import UncertainFloat
+
+
+class CifStructureResourceAttributes(StructureResourceAttributes):
+    cif_chemical_name_common: str | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_chemical_name_common"
+    )
+    cif_chemical_formula_structural: str | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_chemical_formula_structural"
+    )
+    cif_chemical_formula_sum: str | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_chemical_formula_sum"
+    )
+    cif_chemical_name_structure_type: str | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_chemical_name_structure_type"
+    )
+    cif_exptl_crystal_density_diffrn: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_exptl_crystal_density_diffrn"
+    )
+    cif_diffrn_ambient_temperature: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_diffrn_ambient_temperature"
+    )
+    cif_audit_creation_date: datetime.datetime | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_audit_creation_date"
+    )
+    cif_cell_formula_units_z: int | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_formula_units_z"
+    )
+    cif_cell_volume: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_volume"
+    )
+    cif_cell_length_a: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_a"
+    )
+    cif_cell_length_b: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_b"
+    )
+    cif_cell_length_c: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_c"
+    )
+    cif_cell_length_a_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_a_uncertainty"
+    )
+    cif_cell_length_b_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_b_uncertainty"
+    )
+    cif_cell_length_c_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_length_c_uncertainty"
+    )
+    cif_cell_angle_alpha: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_alpha"
+    )
+    cif_cell_angle_beta: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_beta"
+    )
+    cif_cell_angle_gamma: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_gamma"
+    )
+    cif_cell_angle_alpha_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_alpha_uncertainty"
+    )
+    cif_cell_angle_beta_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_beta_uncertainty"
+    )
+    cif_cell_angle_gamma_uncertainty: float | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_cell_angle_gamma_uncertainty"
+    )
+    cif_space_group_name_H__M_alt: str | None = OptimadeField(
+        None, description="See CIF dict", alias="_cif_space_group_name_H-M_alt"
+    )
+
+    @model_validator(mode="before")
+    def cast_uncertain_floats(cls, values):
+        """Cast uncertain floats to UncertainFloat objects."""
+
+        uncertain_float_fields = [
+            "_cif_cell_length_a",
+            "_cif_cell_length_b",
+            "_cif_cell_length_c",
+            "_cif_cell_angle_alpha",
+            "_cif_cell_angle_beta",
+            "_cif_cell_angle_gamma",
+        ]
+
+        for field in uncertain_float_fields:
+            if field in values and values[field] is not None:
+                unc_float = UncertainFloat(values[field])
+                values[field] = unc_float.value
+                if unc_float.uncertainty == 0.0:
+                    values[f"{field}_uncertainty"] = None
+                else:
+                    values[f"{field}_uncertainty"] = unc_float.uncertainty
+
+        return values
+
+
+class CifStructureResource(StructureResource):
+    attributes: CifStructureResourceAttributes
 
 
 def generate_provider_fields() -> dict[str, list[dict[str, str]]]:

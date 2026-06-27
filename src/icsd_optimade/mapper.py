@@ -2,10 +2,11 @@ from io import BytesIO
 from pathlib import Path
 
 import CifFile
-from optimade.models import ReferenceResource, StructureResource
+from optimade.models import ReferenceResource
 
 from .adapters.structures.pycifrw import from_pycifrw
 from .client import ICSDClient
+from .fields import CifStructureResource as StructureResource
 from .utils import get_cif
 
 
@@ -39,7 +40,8 @@ def map_cif_to_optimade(
     try:
         with BytesIO(cif_bytes) as fp:
             pycifrw_dct = CifFile.ReadCif(fp)
-            attributes = from_pycifrw(pycifrw_dct).model_dump()
+            struct = from_pycifrw(pycifrw_dct)
+            attributes = struct.model_dump(by_alias=True, exclude_unset=True)
     except Exception as exc:
         if ignore_errors:
             return exc
@@ -78,7 +80,7 @@ def map_cif_to_optimade(
         }
     )
 
-    json_str = entry.model_dump_json()
+    json_str = entry.model_dump_json(by_alias=True, exclude_unset=True)
     if references:
         json_str += "\n" + "\n".join(x.model_dump_json() for x in references)
 
