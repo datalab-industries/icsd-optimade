@@ -106,6 +106,7 @@ def ingest_by_year(
     log_level: str = "WARNING",
     skip_download: bool = False,
     combine_only: bool = False,
+    download_only: bool = False,
 ):
     """Ingest ICSD data by year range, downloading CIFs and mapping to OPTIMADE format.
 
@@ -118,6 +119,7 @@ def ingest_by_year(
         log_level: Logging level as a string (e.g., "INFO", "DEBUG").
         skip_download: If True, skip the download step and only combine existing files.
         combine_only: If True, only combine existing mapped files without downloading or mapping.
+        download_only: If True, only download CIFs without mapping to OPTIMADE, caching them to disk.
 
     """
 
@@ -160,6 +162,9 @@ def ingest_by_year(
             for dates in date_ranges:
                 total_count, bad_count = chunk_processor(dates)
                 pbar.update(total_count)
+
+    if download_only:
+        return
 
     total_bad = 0
     total = 0
@@ -276,6 +281,13 @@ def cli():
     parser.add_argument("--combine-only", action="store_true")
     parser.add_argument("--log-level", type=str, default="WARNING")
     parser.add_argument("--skip-download", action="store_true")
+    parser.add_argument("--since", type=int, default=1950)
+    parser.add_argument(
+        "--download-only",
+        action="store_true",
+        help="Only download CIFs without mapping to OPTIMADE",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     data_dir = Path(__file__).parent.parent.parent / "data"
 
@@ -286,6 +298,8 @@ def cli():
     log_level = args.log_level
     skip_download = args.skip_download
     combine_only = args.combine_only
+    start_year = args.since
+    download_only = args.download_only
 
     ingest_by_year(
         pool_size=pool_size,
@@ -294,4 +308,6 @@ def cli():
         skip_download=skip_download,
         combine_only=combine_only,
         data_dir=data_dir,
+        start_year=start_year,
+        download_only=download_only,
     )

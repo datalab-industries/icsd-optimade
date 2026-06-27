@@ -95,6 +95,8 @@ def get_cif(
 
     if not cif_bytes:
         if download:
+            log = setup_log("ingest")
+            log.debug("Downloading CIF for entry %s", entry_id)
             cif_bytes = client.get_cif(entry_id)
         else:
             raise RuntimeError(
