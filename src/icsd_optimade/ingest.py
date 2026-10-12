@@ -225,8 +225,10 @@ def ingest_by_year(
             final_jsonl.write(
                 json.dumps(
                     {
-                        "data": generate_icsd_info_endpoint()["data"].model_dump(
-                            exclude_unset=True, exclude_none=False
+                        "data": json.loads(
+                            generate_icsd_info_endpoint()["data"].model_dump_json(
+                                exclude_unset=True, exclude_none=False
+                            )
                         )
                     }
                 )
