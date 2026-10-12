@@ -193,6 +193,16 @@ class ICSDClient:
                     retries += 1
                     continue
 
+                if response.status_code == 401:
+                    sleep_time = 60 * 2**retries
+                    self.log.warning(
+                        f"Hit 401 limit after {datetime.datetime.now() - self._ctime} on process {os.getpid()} -- {self._cifs_downloaded} CIFs downloaded. Process sleeping for %s minutes before retrying",
+                        sleep_time / 60,
+                    )
+                    time.sleep(sleep_time)
+                    retries += 1
+                    continue
+
                 if response.status_code == 200:
                     self._cifs_downloaded += 1
 
