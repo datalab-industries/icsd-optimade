@@ -14,7 +14,7 @@ def map_cif_to_optimade(
     client: ICSDClient,
     data_dir: Path | None = None,
     download: bool = True,
-    ignore_errors: bool = False,
+    ignore_errors: bool = True,
 ) -> str | Exception:
     """For a given ICSD entry ID (CollCode), either look up a cached
     copy of the CIF or download from the ICSD API and map it into an OPTIMADE
