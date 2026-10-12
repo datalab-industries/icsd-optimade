@@ -152,7 +152,7 @@ def generate_provider_fields() -> dict[str, list[dict[str, str]]]:
                 "description": "Raw string value of unit cell angle gamma from the CIF.",
             },
             {
-                "name": "_cif_space_group_name_H-M_alt",
+                "name": "_cif_space_group_name_h_m_alt",
                 "type": "string",
                 "description": "spg symbol",
             },
