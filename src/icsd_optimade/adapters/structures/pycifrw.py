@@ -408,9 +408,14 @@ def _get_species_enumerated(
     for site, site_data in temp_sites_struct.items():
         total_ratio = sum(site_data["concentrations"])
         if total_ratio > 1.0:
-            raise ValueError(
-                f"The concentration at the site {site} is greater than 1.0, please check the CIF file."
-            )
+            if total_ratio > 1.05:
+                raise ValueError(
+                    f"The concentration {site_data['concentrations']} at the site {site} is greater than 1.0 ({total_ratio}), please check the CIF file."
+                )
+            # renormalise concentrations if only slightly above 1, as per CIF spec
+            site_data["concentrations"] = [
+                x / total_ratio for x in site_data["concentrations"]
+            ]
 
         if total_ratio < 1.0:
             vacancy_concentration = 1.0 - total_ratio
